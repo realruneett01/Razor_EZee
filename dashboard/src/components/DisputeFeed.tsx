@@ -180,7 +180,7 @@ export const DisputeFeed: React.FC<DisputeFeedProps> = ({ disputes, loading, err
                         </button>
                       )}
                       <a
-                        href={`http://localhost:8000/api/dossiers/${d.id}`}
+                        href={`${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api"}/dossiers/${d.id}`}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[11px] font-medium transition"

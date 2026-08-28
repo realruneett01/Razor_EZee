@@ -7,7 +7,7 @@ import { HealthGauge, RatioReport } from "@/components/HealthGauge";
 import { BotAttackLog, VelocityLogItem } from "@/components/BotAttackLog";
 import { ShieldCheck, Zap, TrendingUp, AlertTriangle } from "lucide-react";
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 
 export default function DashboardPage() {
   const [disputes, setDisputes] = useState<DisputeItem[] | null>(null);
