@@ -1,0 +1,19 @@
+{
+  "scenario_id": "partial_011",
+  "tier": "partial",
+  "missing_field": "pod_image",
+  "ground_truth": {
+    "awb_number": "XPRESSBEES-HYD-53036072",
+    "recipient_name": "Sunita Chawla",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": false,
+    "customer_chat_admission": true,
+    "contradiction_quote": "I have the items with me here, delivered yesterday, but the seal was broken.",
+    "expected_completeness_bucket": "low"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "chat_log": "chat_log.txt"
+  }
+}

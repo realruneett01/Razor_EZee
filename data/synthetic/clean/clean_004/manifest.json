@@ -1,0 +1,20 @@
+{
+  "scenario_id": "clean_004",
+  "tier": "clean",
+  "missing_field": null,
+  "ground_truth": {
+    "awb_number": "XPRESSBEES-MUM-78159587",
+    "recipient_name": "Sneha Patel",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": true,
+    "customer_chat_admission": true,
+    "contradiction_quote": "I collected the package from my building security guard on Tuesday, but I want to return it.",
+    "expected_completeness_bucket": "high"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "pod_image": "pod.png",
+    "chat_log": "chat_log.txt"
+  }
+}

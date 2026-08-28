@@ -1,0 +1,19 @@
+{
+  "scenario_id": "partial_006",
+  "tier": "partial",
+  "missing_field": "awb_image",
+  "ground_truth": {
+    "awb_number": null,
+    "recipient_name": null,
+    "delivery_status": "UNKNOWN",
+    "delivery_timestamp": null,
+    "pod_signature_verified": true,
+    "customer_chat_admission": true,
+    "contradiction_quote": "Package was delivered to my doorstep yesterday afternoon, but I already bought an alternative.",
+    "expected_completeness_bucket": "low"
+  },
+  "files": {
+    "pod_image": "pod.png",
+    "chat_log": "chat_log.txt"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "scenario_id": "clean_007",
+  "tier": "clean",
+  "missing_field": null,
+  "ground_truth": {
+    "awb_number": "DTDC-BEN-28572252",
+    "recipient_name": "Amitabh Sen",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": true,
+    "customer_chat_admission": true,
+    "contradiction_quote": "My brother received the parcel on my behalf on 14th Aug, but we decided we don't need it.",
+    "expected_completeness_bucket": "high"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "pod_image": "pod.png",
+    "chat_log": "chat_log.txt"
+  }
+}

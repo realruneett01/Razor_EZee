@@ -1,0 +1,20 @@
+{
+  "scenario_id": "adversarial_004",
+  "tier": "adversarial",
+  "missing_field": null,
+  "ground_truth": {
+    "awb_number": "DELHIVERY-KOL-64008708",
+    "recipient_name": "Sneha Patel",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": false,
+    "customer_chat_admission": false,
+    "contradiction_quote": "",
+    "expected_completeness_bucket": "low"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "pod_image": "pod.png",
+    "chat_log": "chat_log.txt"
+  }
+}

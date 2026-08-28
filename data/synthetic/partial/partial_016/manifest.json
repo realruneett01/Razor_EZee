@@ -1,0 +1,19 @@
+{
+  "scenario_id": "partial_016",
+  "tier": "partial",
+  "missing_field": "chat_log",
+  "ground_truth": {
+    "awb_number": "BLUEDART-AHM-33206579",
+    "recipient_name": "Amitabh Sen",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": true,
+    "customer_chat_admission": false,
+    "contradiction_quote": "",
+    "expected_completeness_bucket": "low"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "pod_image": "pod.png"
+  }
+}

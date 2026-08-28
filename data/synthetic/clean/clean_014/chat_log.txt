@@ -1,0 +1,6 @@
+[WhatsApp Support Chat — Order order_ord_536196]
+[2026-08-14 10:15:22] Customer (Aditya Kulkarni): Hi, I have an issue with my order.
+[2026-08-14 10:16:05] Support Bot: Hello! Thank you for contacting merchant support. How can we help you today?
+[2026-08-14 10:17:40] Customer (Aditya Kulkarni): I collected the package from my building security guard on Tuesday, but I want to return it.
+[2026-08-14 10:18:30] Support Bot: We understand your concern. Please provide photos so our returns team can review.
+[2026-08-14 10:25:10] Customer (Aditya Kulkarni): I have already filed a dispute with my bank.

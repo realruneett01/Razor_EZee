@@ -1,0 +1,20 @@
+{
+  "scenario_id": "clean_050",
+  "tier": "clean",
+  "missing_field": null,
+  "ground_truth": {
+    "awb_number": "DTDC-KOL-63031203",
+    "recipient_name": "Rajesh Gupta",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": true,
+    "customer_chat_admission": true,
+    "contradiction_quote": "Yes, I received the box yesterday at 2 PM, but the product inside was blue instead of black.",
+    "expected_completeness_bucket": "high"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "pod_image": "pod.png",
+    "chat_log": "chat_log.txt"
+  }
+}

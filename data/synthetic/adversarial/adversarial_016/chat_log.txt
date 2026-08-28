@@ -1,0 +1,6 @@
+[WhatsApp Support Chat — Order order_ord_728896]
+[2026-08-14 11:02:10] Customer (Kavita Rao): Where is my shipment? It hasn't arrived!
+[2026-08-14 11:03:00] Support Bot: Hello Kavita Rao! Let us check the tracking status for order order_ord_728896.
+[2026-08-14 11:04:15] Customer (Kavita Rao): I demand a full refund immediately. Delivery was never made to my address.
+[2026-08-14 11:05:40] Support Bot: We have escalated this to our logistics partner for investigation.
+[2026-08-14 11:10:00] Customer (Kavita Rao): I am initiating a bank chargeback right now.

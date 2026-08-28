@@ -1,0 +1,19 @@
+{
+  "scenario_id": "partial_032",
+  "tier": "partial",
+  "missing_field": "pod_image",
+  "ground_truth": {
+    "awb_number": "DTDC-MUM-19787090",
+    "recipient_name": "Ananya Deshmukh",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": false,
+    "customer_chat_admission": true,
+    "contradiction_quote": "Received the shipment on Friday, but I am raising a chargeback because of delayed shipping.",
+    "expected_completeness_bucket": "low"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "chat_log": "chat_log.txt"
+  }
+}

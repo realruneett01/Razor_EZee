@@ -1,0 +1,20 @@
+{
+  "scenario_id": "clean_039",
+  "tier": "clean",
+  "missing_field": null,
+  "ground_truth": {
+    "awb_number": "DTDC-HYD-27514010",
+    "recipient_name": "Ritu Singhania",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": true,
+    "customer_chat_admission": true,
+    "contradiction_quote": "Package was delivered to my doorstep yesterday afternoon, but I already bought an alternative.",
+    "expected_completeness_bucket": "high"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "pod_image": "pod.png",
+    "chat_log": "chat_log.txt"
+  }
+}

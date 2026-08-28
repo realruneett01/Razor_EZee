@@ -1,0 +1,20 @@
+{
+  "scenario_id": "clean_023",
+  "tier": "clean",
+  "missing_field": null,
+  "ground_truth": {
+    "awb_number": "BLUEDART-PUN-73584863",
+    "recipient_name": "Rohan Verma",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": true,
+    "customer_chat_admission": true,
+    "contradiction_quote": "Received the shipment on Friday, but I am raising a chargeback because of delayed shipping.",
+    "expected_completeness_bucket": "high"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "pod_image": "pod.png",
+    "chat_log": "chat_log.txt"
+  }
+}

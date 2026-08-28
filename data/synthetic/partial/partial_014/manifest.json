@@ -1,0 +1,19 @@
+{
+  "scenario_id": "partial_014",
+  "tier": "partial",
+  "missing_field": "pod_image",
+  "ground_truth": {
+    "awb_number": "XPRESSBEES-PUN-17824896",
+    "recipient_name": "Meera Nambiar",
+    "delivery_status": "DELIVERED",
+    "delivery_timestamp": "2026-08-14T14:32:00Z",
+    "pod_signature_verified": false,
+    "customer_chat_admission": true,
+    "contradiction_quote": "I opened the package this morning after taking it from the courier guy, but the accessories were missing.",
+    "expected_completeness_bucket": "low"
+  },
+  "files": {
+    "awb_image": "awb.jpg",
+    "chat_log": "chat_log.txt"
+  }
+}

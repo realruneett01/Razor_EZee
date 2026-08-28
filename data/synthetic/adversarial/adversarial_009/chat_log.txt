@@ -1,0 +1,6 @@
+[WhatsApp Support Chat — Order order_ord_846209]
+[2026-08-14 11:02:10] Customer (Harish Joshi): Where is my shipment? It hasn't arrived!
+[2026-08-14 11:03:00] Support Bot: Hello Harish Joshi! Let us check the tracking status for order order_ord_846209.
+[2026-08-14 11:04:15] Customer (Harish Joshi): I was home all day and nobody rang the bell. I have not received anything.
+[2026-08-14 11:05:40] Support Bot: We have escalated this to our logistics partner for investigation.
+[2026-08-14 11:10:00] Customer (Harish Joshi): I am initiating a bank chargeback right now.

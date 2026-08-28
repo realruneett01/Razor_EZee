@@ -1,0 +1,6 @@
+[WhatsApp Support Chat — Order order_ord_155642]
+[2026-08-14 10:15:22] Customer (Ananya Deshmukh): Hi, I have an issue with my order.
+[2026-08-14 10:16:05] Support Bot: Hello! Thank you for contacting merchant support. How can we help you today?
+[2026-08-14 10:17:40] Customer (Ananya Deshmukh): The delivery agent handed me the shipment yesterday, but the size is too large.
+[2026-08-14 10:18:30] Support Bot: We understand your concern. Please provide photos so our returns team can review.
+[2026-08-14 10:25:10] Customer (Ananya Deshmukh): I have already filed a dispute with my bank.
