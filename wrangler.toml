@@ -1,7 +1,3 @@
 name = "razor-ezee"
 compatibility_date = "2026-08-29"
 pages_build_output_dir = "./dashboard/out"
-
-[assets]
-directory = "./dashboard/out"
-binding = "ASSETS"
