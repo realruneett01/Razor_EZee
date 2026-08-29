@@ -90,7 +90,7 @@ export default function DisputeStudioPage() {
               <h1 className="text-2xl font-bold text-white tracking-tight">Dispute Studio & Dossier Inspector</h1>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Multimodal Evidence Triangulation · Gemini 3 Flash Extraction · Representment Dossier Generator
+              Multimodal Evidence Triangulation · Automated Extraction · Representment Dossier Generator
             </p>
           </div>
 
@@ -276,11 +276,11 @@ export default function DisputeStudioPage() {
                   </div>
                 </div>
 
-                {/* Gemini 3 Flash Legal Representment Draft */}
+                {/* Autonomous Structured Legal Representment Draft */}
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/90 space-y-2">
                   <div className="flex items-center space-x-2 text-xs font-semibold text-indigo-300">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Gemini 3 Flash Structured Legal Representment</span>
+                    <span>Autonomous Structured Legal Representment</span>
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed font-mono bg-slate-900/60 p-3 rounded-lg border border-slate-800">
                     Carrier tracking records confirm physical delivery to the recipient address on file. 

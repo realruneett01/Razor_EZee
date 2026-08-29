@@ -83,12 +83,12 @@ export default function SettingsPage() {
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
-        setTestResult("Zero-Secrets Verification Passed: Backend securely verified Gemini 3 Flash, Razorpay API, Upstash Redis, and Supabase DB without transmitting secrets to the client.");
+        setTestResult("Zero-Secrets Verification Passed: Backend securely verified AI Inference Engine, Razorpay API, Upstash Redis, and Supabase DB without transmitting secrets to the client.");
       } else {
         setTestResult("Backend status check returned non-200 response.");
       }
     } catch {
-      setTestResult("All backend services verified locally: FastAPI, Gemini 3 Flash, Upstash Redis, and Supabase.");
+      setTestResult("All backend services verified locally: FastAPI, AI Inference Engine, Upstash Redis, and Supabase.");
     } finally {
       setTesting(false);
       setTimeout(() => setTestResult(null), 6000);
@@ -188,7 +188,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center space-x-2">
                 <Cpu className="w-5 h-5 text-cyan-400" />
-                <h2 className="text-base font-semibold text-white">Gemini 3 Flash AI Engine & Redis Sliding Window</h2>
+                <h2 className="text-base font-semibold text-white">Multimodal AI Reasoning Engine & Redis Sliding Window</h2>
               </div>
               <span className="flex items-center space-x-1.5 px-2.5 py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-full text-[11px] font-medium">
                 <CheckCircle2 className="w-3 h-3" />
@@ -198,15 +198,15 @@ export default function SettingsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
-                <span className="text-slate-400 text-[11px]">Active Multimodal Reasoning Engine</span>
+                <span className="text-slate-400 text-[11px]">Active Reasoning Engine Mode</span>
                 <div className="font-mono text-cyan-300 font-medium flex items-center space-x-2">
-                  <span>{status?.credentials.gemini_model || "gemini-3-flash-preview"}</span>
+                  <span>Multimodal Neural Vision</span>
                   <span className="text-[10px] bg-cyan-950 px-1.5 py-0.5 rounded text-cyan-400 border border-cyan-800">Primary</span>
                 </div>
               </div>
 
               <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
-                <span className="text-slate-400 text-[11px]">Gemini API Key Protection</span>
+                <span className="text-slate-400 text-[11px]">AI Model API Key Protection</span>
                 <div className="font-mono text-slate-400 flex items-center space-x-1">
                   <span>••••••••••••••••••••••••</span>
                   <span className="text-[10px] text-emerald-400 ml-2 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">Stored in Backend .env</span>
