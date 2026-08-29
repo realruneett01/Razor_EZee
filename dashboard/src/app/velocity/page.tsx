@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { VelocityLogItem } from "@/components/BotAttackLog";
 import { VelocityWaveform } from "@/components/VelocityWaveform";
+import { StatusBadge } from "@/components/StatusBadge";
+import { formatFingerprint, formatTxnCategory } from "@/lib/formatters";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 
@@ -57,7 +59,7 @@ export default function VelocityShieldPage() {
     const steps = [];
     if (type === "micro_burst") {
       for (let i = 1; i <= 5; i++) {
-        let action = i >= 5 ? "CHALLENGE_STEP_UP_OTP" : i >= 3 ? "FLAG_FOR_REVIEW" : "ALLOW";
+        let action = i >= 5 ? "OTP_CHALLENGE" : i >= 3 ? "FLAG_REVIEW" : "ALLOW";
         steps.push({
           step: i,
           amount: 2.50,
@@ -70,7 +72,7 @@ export default function VelocityShieldPage() {
       }
     } else if (type === "frequency_burst") {
       for (let i = 1; i <= 10; i++) {
-        let action = i > 7 ? "CHALLENGE_STEP_UP_OTP" : i > 4 ? "FLAG_FOR_REVIEW" : "ALLOW";
+        let action = i > 7 ? "OTP_CHALLENGE" : i > 4 ? "FLAG_REVIEW" : "ALLOW";
         steps.push({
           step: i,
           amount: 850.00,
@@ -98,39 +100,39 @@ export default function VelocityShieldPage() {
   const displayLogs: VelocityLogItem[] = logs && logs.length > 0 ? logs : [
     {
       id: "ev-1",
-      fingerprint_hash: "a4f89d12e9b042ca",
+      fingerprint_hash: "fp_a4f89d12e9b042ca",
       amount: 250,
       is_micro_transaction: true,
-      risk_action_taken: "CHALLENGE_STEP_UP_OTP",
+      risk_action_taken: "OTP_CHALLENGE",
       created_at: new Date(Date.now() - 2000).toISOString(),
     },
     {
       id: "ev-2",
-      fingerprint_hash: "7bc2901fa55e8840",
+      fingerprint_hash: "fp_7bc2901fa55e8840",
       amount: 500,
       is_micro_transaction: true,
-      risk_action_taken: "FLAG_FOR_REVIEW",
+      risk_action_taken: "FLAG_REVIEW",
       created_at: new Date(Date.now() - 14000).toISOString(),
     },
     {
       id: "ev-3",
-      fingerprint_hash: "c38910eb441972f0",
+      fingerprint_hash: "fp_c38910eb441972f0",
       amount: 85000,
       is_micro_transaction: false,
-      risk_action_taken: "CHALLENGE_STEP_UP_OTP",
+      risk_action_taken: "OTP_CHALLENGE",
       created_at: new Date(Date.now() - 38000).toISOString(),
     },
     {
       id: "ev-4",
-      fingerprint_hash: "55e28a9901bc4309",
+      fingerprint_hash: "fp_55e28a9901bc4309",
       amount: 300,
       is_micro_transaction: true,
-      risk_action_taken: "FLAG_FOR_REVIEW",
+      risk_action_taken: "FLAG_REVIEW",
       created_at: new Date(Date.now() - 52000).toISOString(),
     },
     {
       id: "ev-5",
-      fingerprint_hash: "991e4a11b820a455",
+      fingerprint_hash: "fp_991e4a11b820a455",
       amount: 145000,
       is_micro_transaction: false,
       risk_action_taken: "ALLOW",
@@ -178,18 +180,18 @@ export default function VelocityShieldPage() {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Inject synthetic bot sweeps into the sliding-window engine to observe real-time gating at Request 3 (<span className="text-amber-400 font-mono font-medium">FLAG</span>) and Request 5 (<span className="text-rose-400 font-mono font-medium">OTP_CHALLENGE</span>).
+              Inject synthetic bot sweeps into the sliding-window engine to observe real-time gating at Request 3 (<span className="text-amber-400 font-mono font-medium">Flagged for Review</span>) and Request 5 (<span className="text-rose-400 font-mono font-medium">Step-Up Verification</span>).
             </p>
 
-            {/* Flat Trigger Buttons */}
+            {/* Flat Trigger Buttons with Modern Executive Labels */}
             <div className="grid grid-cols-3 gap-2.5">
               <button
                 onClick={() => runBotSimulation("micro_burst")}
                 disabled={simulating}
                 className="p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-left transition disabled:opacity-50"
               >
-                <div className="text-xs font-semibold text-rose-300">Card Sweep</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">5x ₹2.50 Micro</div>
+                <div className="text-xs font-semibold text-rose-300">Micro-Probe Sweep</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">5x ₹2.50 Testing</div>
               </button>
 
               <button
@@ -197,8 +199,8 @@ export default function VelocityShieldPage() {
                 disabled={simulating}
                 className="p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-left transition disabled:opacity-50"
               >
-                <div className="text-xs font-semibold text-amber-300">Burst 10x</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">10x in 60s</div>
+                <div className="text-xs font-semibold text-amber-300">Velocity Surge</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">10x Volume / 60s</div>
               </button>
 
               <button
@@ -206,39 +208,27 @@ export default function VelocityShieldPage() {
                 disabled={simulating}
                 className="p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-left transition disabled:opacity-50"
               >
-                <div className="text-xs font-semibold text-emerald-300">Legit Txn</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">1x ₹1,450 Normal</div>
+                <div className="text-xs font-semibold text-emerald-300">Regular Checkout</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">1x ₹1,450 Standard</div>
               </button>
             </div>
 
-            {/* Live Stream Execution Feed */}
+            {/* Live Stream Execution Feed with Reusable StatusBadge */}
             {simResults.length > 0 && (
-              <div className="pt-2 space-y-1.5 font-mono text-xs max-h-40 overflow-y-auto pr-1">
+              <div className="pt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
                 {simResults.map((r) => (
                   <div
                     key={r.step}
-                    className="p-2 rounded-lg bg-white/[0.02] border border-white/[0.05] flex items-center justify-between"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/40 border border-white/[0.04]"
                   >
-                    <div className="flex items-center space-x-2">
-                      <span className="text-slate-500">#{r.step}</span>
-                      <span className="text-slate-300">{r.hash}</span>
-                      <span className="text-white font-bold">₹{r.amount.toFixed(2)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-500 font-mono text-xs">#{r.step}</span>
+                      <span className="text-zinc-400 text-xs font-mono">
+                        {formatFingerprint(r.hash)}
+                      </span>
+                      <span className="text-zinc-200 text-xs font-semibold font-mono">₹{r.amount.toFixed(2)}</span>
                     </div>
-                    <div>
-                      {r.action === "CHALLENGE_STEP_UP_OTP" ? (
-                        <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">
-                          OTP_CHALLENGE
-                        </span>
-                      ) : r.action === "FLAG_FOR_REVIEW" ? (
-                        <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-                          FLAG_REVIEW
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                          ALLOW
-                        </span>
-                      )}
-                    </div>
+                    <StatusBadge verdict={r.action} />
                   </div>
                 ))}
               </div>
@@ -255,7 +245,7 @@ export default function VelocityShieldPage() {
             <div className="space-y-4 text-xs">
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-slate-300">Micro-Transaction Max Threshold</span>
+                  <span className="text-slate-300">Micro-Probe Sub-Threshold Cap</span>
                   <span className="font-mono text-cyan-300 font-bold">₹{microThreshold}.00</span>
                 </div>
                 <input
@@ -292,7 +282,7 @@ export default function VelocityShieldPage() {
           </div>
         </div>
 
-        {/* Streamlined Mono-Spaced Telemetry Event Strip */}
+        {/* Streamlined Modernized Telemetry Event Strip */}
         <div className="rounded-2xl p-6 bg-zinc-900/30 backdrop-blur-xl border border-white/[0.08] shadow-lg space-y-3">
           <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
             <div className="flex items-center space-x-2">
@@ -302,36 +292,24 @@ export default function VelocityShieldPage() {
             <span className="text-xs font-mono text-slate-400">Total Recorded: {displayLogs.length}</span>
           </div>
 
-          {/* Compact Mono-spaced Event Rows */}
-          <div className="divide-y divide-white/[0.04] font-mono text-xs">
-            {displayLogs.map((l, index) => (
+          {/* Compact Telemetry Stream Rows with StatusBadge */}
+          <div className="divide-y divide-white/[0.04]">
+            {displayLogs.map((item, index) => (
               <div
-                key={l.id || index}
-                className="py-2.5 flex items-center justify-between hover:bg-white/[0.02] px-2 rounded-lg transition"
+                key={item.id || index}
+                className="flex items-center justify-between py-2.5 px-2 hover:bg-white/[0.02] rounded-lg transition text-xs"
               >
-                <div className="flex items-center space-x-4">
-                  <span className="text-slate-500">{new Date(l.created_at).toLocaleTimeString("en-IN")}</span>
-                  <span className="text-slate-300 font-medium">{l.fingerprint_hash}</span>
-                  {l.is_micro_transaction && (
-                    <span className="text-[10px] text-amber-400">MICRO_TXN</span>
-                  )}
+                <div className="flex items-center gap-3">
+                  <span className="text-zinc-500 font-mono text-[11px]">{new Date(item.created_at).toLocaleTimeString("en-IN")}</span>
+                  <span className="text-zinc-300 font-mono">{formatFingerprint(item.fingerprint_hash)}</span>
+                  <span className="text-[11px] text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-800/60 font-mono">
+                    {formatTxnCategory(item.is_micro_transaction ? "MICRO_TXN" : "STANDARD")}
+                  </span>
                 </div>
-
-                <div className="flex items-center space-x-4">
-                  <span className="text-white font-bold">₹{(l.amount / 100).toFixed(2)}</span>
-                  {l.risk_action_taken === "CHALLENGE_STEP_UP_OTP" ? (
-                    <span className="text-[11px] font-bold text-rose-400">
-                      OTP_CHALLENGE
-                    </span>
-                  ) : l.risk_action_taken === "FLAG_FOR_REVIEW" ? (
-                    <span className="text-[11px] font-bold text-amber-400">
-                      FLAG_REVIEW
-                    </span>
-                  ) : (
-                    <span className="text-[11px] font-semibold text-emerald-400">
-                      ALLOW
-                    </span>
-                  )}
+                
+                <div className="flex items-center gap-4">
+                  <span className="text-zinc-100 font-semibold font-mono">₹{(item.amount / 100).toFixed(2)}</span>
+                  <StatusBadge verdict={item.risk_action_taken} />
                 </div>
               </div>
             ))}

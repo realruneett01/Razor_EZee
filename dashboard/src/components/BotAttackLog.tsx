@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { ShieldAlert, ShieldX, Clock, Cpu, Filter, Activity, Zap, Radio } from "lucide-react";
 import { Sparkline } from "@/components/Sparkline";
+import { StatusBadge } from "@/components/StatusBadge";
+import { formatFingerprint, formatTxnCategory } from "@/lib/formatters";
 
 export interface VelocityLogItem {
   id: string;
@@ -44,26 +46,26 @@ export const BotAttackLog: React.FC<BotAttackLogProps> = ({ logs, loading, error
   const displayLogs: VelocityLogItem[] = logs && logs.length > 0 ? logs : [
     {
       id: "bot-1",
-      fingerprint_hash: "f7a192c8bb4e3391",
+      fingerprint_hash: "fp_f7a192c8bb4e3391",
       amount: 250,
       is_micro_transaction: true,
-      risk_action_taken: "CHALLENGE_STEP_UP_OTP",
+      risk_action_taken: "OTP_CHALLENGE",
       created_at: new Date(Date.now() - 2000).toISOString(),
     },
     {
       id: "bot-2",
-      fingerprint_hash: "89bc21ef45a08892",
+      fingerprint_hash: "fp_89bc21ef45a08892",
       amount: 500,
       is_micro_transaction: true,
-      risk_action_taken: "FLAG_FOR_REVIEW",
+      risk_action_taken: "FLAG_REVIEW",
       created_at: new Date(Date.now() - 14000).toISOString(),
     },
     {
       id: "bot-3",
-      fingerprint_hash: "d42e18fa77b01934",
+      fingerprint_hash: "fp_d42e18fa77b01934",
       amount: 85000,
       is_micro_transaction: false,
-      risk_action_taken: "CHALLENGE_STEP_UP_OTP",
+      risk_action_taken: "OTP_CHALLENGE",
       created_at: new Date(Date.now() - 32000).toISOString(),
     },
   ];
@@ -103,37 +105,24 @@ export const BotAttackLog: React.FC<BotAttackLogProps> = ({ logs, loading, error
           <Sparkline data={liveStream} color="cyan" height={38} />
         </div>
 
-        {/* Real-time Activity Logs */}
-        <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
+        {/* Real-time Activity Logs with StatusBadge and Modern Copy */}
+        <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
           {displayLogs.map((log) => (
             <div
               key={log.id}
               className="p-3 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.05] flex items-center justify-between transition-all duration-200"
             >
               <div className="flex items-center space-x-3">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  log.risk_action_taken === "CHALLENGE_STEP_UP_OTP"
-                    ? "bg-rose-500/10 border border-rose-500/20 text-rose-400"
-                    : "bg-amber-500/10 border border-amber-500/20 text-amber-400"
-                }`}>
-                  {log.risk_action_taken === "CHALLENGE_STEP_UP_OTP" ? (
-                    <ShieldX className="w-4 h-4" />
-                  ) : (
-                    <ShieldAlert className="w-4 h-4" />
-                  )}
-                </div>
-                <div>
+                <div className="flex flex-col">
                   <div className="flex items-center space-x-2">
                     <span className="font-mono text-xs text-slate-200 font-medium">
-                      {log.fingerprint_hash.substring(0, 16)}...
+                      {formatFingerprint(log.fingerprint_hash)}
                     </span>
-                    {log.is_micro_transaction && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-full">
-                        MICRO-TXN
-                      </span>
-                    )}
+                    <span className="text-[10px] text-zinc-400 px-1.5 py-0.2 rounded bg-zinc-800/60 font-mono">
+                      {formatTxnCategory(log.is_micro_transaction ? "MICRO_TXN" : "STANDARD")}
+                    </span>
                   </div>
-                  <div className="text-[11px] text-slate-400 flex items-center space-x-2 mt-0.5">
+                  <div className="text-[11px] text-slate-400 flex items-center space-x-2 mt-0.5 font-mono">
                     <span className="font-semibold text-white">₹{(log.amount / 100).toFixed(2)}</span>
                     <span>·</span>
                     <span className="flex items-center text-slate-500">
@@ -144,17 +133,7 @@ export const BotAttackLog: React.FC<BotAttackLogProps> = ({ logs, loading, error
                 </div>
               </div>
 
-              <div>
-                {log.risk_action_taken === "CHALLENGE_STEP_UP_OTP" ? (
-                  <span className="px-2.5 py-1 text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 rounded-xl shadow-sm shadow-rose-500/20">
-                    CHALLENGE (OTP)
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-1 text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-xl shadow-sm shadow-amber-500/20">
-                    FLAG FOR REVIEW
-                  </span>
-                )}
-              </div>
+              <StatusBadge verdict={log.risk_action_taken} />
             </div>
           ))}
         </div>
