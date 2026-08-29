@@ -74,13 +74,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onRefresh, isRefreshing = false 
           })}
         </nav>
 
-        {/* Actions & Status */}
+        {/* Actions */}
         <div className="flex items-center space-x-3">
-          <div className="hidden lg:flex items-center space-x-2 text-xs bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-slate-300 font-mono text-[11px]">Gemini 3 Flash</span>
-          </div>
-
           {onRefresh && (
             <button
               onClick={onRefresh}
