@@ -78,7 +78,7 @@ export const HealthGauge: React.FC<HealthGaugeProps> = ({ report, loading, error
           badge: "bg-emerald-500 text-slate-900",
           glow: "rgba(16, 185, 129, 0.35)",
           label: "SAFE REGULATORY ZONE",
-          sublabel: "Autonomous recovery running smoothly",
+          sublabel: "Normal operating bandwidth",
           icon: CheckCircle2,
         };
     }
@@ -307,7 +307,7 @@ export const HealthGauge: React.FC<HealthGaugeProps> = ({ report, loading, error
               ? "Critical regulatory alert! 30-day dispute ratio has exceeded 0.45%. Preemptive Velocity Shield is blocking high-risk card testing to prevent acquiring bank settlement freezes."
               : status === "watch"
               ? "Ratio is elevated (0.30% - 0.45%). Adaptive step-up OTP friction is activated on suspicious BINs to keep total dispute volume beneath the card network threshold."
-              : "Dispute ratio is firmly within the safe operating envelope (< 0.30%). Autonomous multimodal evidence dossiers are continuously recovering contested funds."}
+              : "Dispute ratio is firmly within the safe operating envelope (< 0.30%)."}
           </p>
         </div>
       </div>
