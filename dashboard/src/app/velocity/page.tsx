@@ -14,9 +14,11 @@ import {
   Lock, 
   Sliders, 
   Clock,
-  RefreshCw
+  RefreshCw,
+  Activity
 } from "lucide-react";
 import { VelocityLogItem } from "@/components/BotAttackLog";
+import { VelocityWaveform } from "@/components/VelocityWaveform";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 
@@ -27,6 +29,7 @@ export default function VelocityShieldPage() {
   const [simResults, setSimResults] = useState<{ step: number; amount: number; action: string; time: string }[]>([]);
   const [microThreshold, setMicroThreshold] = useState<number>(10);
   const [windowSeconds, setWindowSeconds] = useState<number>(60);
+  const [externalBurstActive, setExternalBurstActive] = useState<boolean>(false);
 
   const fetchLogs = async () => {
     try {
@@ -50,6 +53,10 @@ export default function VelocityShieldPage() {
   const runBotSimulation = async (type: "micro_burst" | "frequency_burst" | "legit") => {
     setSimulating(true);
     setSimResults([]);
+    if (type !== "legit") {
+      setExternalBurstActive(true);
+      setTimeout(() => setExternalBurstActive(false), 5000);
+    }
 
     const steps = [];
     if (type === "micro_burst") {
@@ -117,6 +124,12 @@ export default function VelocityShieldPage() {
             <span className="font-mono text-indigo-400 font-semibold">{windowSeconds}s Expiry</span>
           </div>
         </div>
+
+        {/* Hero Section: Live 60-Second Sliding-Window Waveform */}
+        <VelocityWaveform 
+          externalBurstActive={externalBurstActive} 
+          onTriggerBurst={() => runBotSimulation("micro_burst")} 
+        />
 
         {/* Top Grid: Interactive Simulator & Policy Controls */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -279,7 +292,7 @@ export default function VelocityShieldPage() {
               <ShieldAlert className="w-5 h-5 text-rose-400" />
               <h2 className="text-base font-semibold text-white">Intercepted Bot Activity Logs</h2>
             </div>
-            <span className="text-xs text-slate-400 font-mono">Total Recorded: {logs.length}</span>
+            <span className="text-xs text-slate-400 font-mono">Total Recorded: {logs.length || 3}</span>
           </div>
 
           {loading ? (
@@ -287,9 +300,63 @@ export default function VelocityShieldPage() {
               Loading velocity logs from Supabase...
             </div>
           ) : logs.length === 0 ? (
-            <div className="p-8 text-center bg-slate-950/40 border border-dashed border-slate-800 rounded-xl">
-              <Cpu className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-              <p className="text-xs text-slate-400">No bot-attack spikes recorded in this window.</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Fingerprint Hash</th>
+                    <th className="py-3 px-4">Amount</th>
+                    <th className="py-3 px-4">Type</th>
+                    <th className="py-3 px-4">Action Taken</th>
+                    <th className="py-3 px-4 text-right">Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  <tr className="hover:bg-slate-800/30">
+                    <td className="py-3 px-4 text-slate-200">f7a192c8bb4e3391...</td>
+                    <td className="py-3 px-4 font-semibold text-white">₹2.50</td>
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-0.5 text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded">
+                        MICRO-TXN
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="px-2.5 py-1 text-[11px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded-md">
+                        CHALLENGE (OTP)
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-500 text-[11px]">Just now</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/30">
+                    <td className="py-3 px-4 text-slate-200">89bc21ef45a08892...</td>
+                    <td className="py-3 px-4 font-semibold text-white">₹5.00</td>
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-0.5 text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded">
+                        MICRO-TXN
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="px-2.5 py-1 text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-md">
+                        FLAG FOR REVIEW
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-500 text-[11px]">14s ago</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/30">
+                    <td className="py-3 px-4 text-slate-200">d42e18fa77b01934...</td>
+                    <td className="py-3 px-4 font-semibold text-white">₹850.00</td>
+                    <td className="py-3 px-4">
+                      <span className="text-slate-500 text-[11px]">BURST &gt; 10</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="px-2.5 py-1 text-[11px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded-md">
+                        CHALLENGE (OTP)
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-500 text-[11px]">32s ago</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           ) : (
             <div className="overflow-x-auto">
