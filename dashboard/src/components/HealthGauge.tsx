@@ -93,10 +93,10 @@ export const HealthGauge: React.FC<HealthGaugeProps> = ({ report, loading, error
   // 0.65% -> (0.65 / 0.80) * 240 = 195 deg -> 150 + 195 = 345 deg
 
   return (
-    <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between relative overflow-hidden">
+    <div className="rounded-3xl p-6 bg-zinc-900/40 backdrop-blur-2xl border border-white/[0.06] shadow-[0_12px_40px_rgba(0,0,0,0.3)] flex flex-col justify-between relative overflow-hidden">
       {/* Background ambient glow based on status */}
       <div 
-        className="absolute top-0 right-0 w-56 h-56 rounded-full blur-3xl pointer-events-none opacity-20 -mr-20 -mt-20 transition-colors duration-500"
+        className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none opacity-20 -mr-20 -mt-20 transition-colors duration-500"
         style={{ backgroundColor: status === "danger" ? "#f43f5e" : status === "watch" ? "#f59e0b" : "#10b981" }}
       />
 

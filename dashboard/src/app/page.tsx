@@ -107,24 +107,26 @@ export default function DashboardPage() {
   const botAttacksTrend = [34, 42, 28, 38, 19, 15, totalBotAttacks || 12];
 
   return (
-    <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#060911] text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white">
       <Navbar onRefresh={loadAllData} isRefreshing={isRefreshing} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 space-y-8">
-        {/* Top Summary Stats Cards with Micro-Sparklines */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-6 space-y-6">
+        {/* Top Summary Stats Cards with Ambient Glassmorphism & Micro-Sparklines */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Active Disputes */}
-          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between hover:border-slate-700 transition">
+          <div className="rounded-3xl p-5 bg-zinc-900/40 backdrop-blur-2xl border border-white/[0.06] shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col justify-between hover:border-white/[0.12] transition-all duration-300">
             <div>
               <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
                 <span className="font-medium">Active Ingested Disputes</span>
-                <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                <div className="w-7 h-7 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
               </div>
               <div className="flex items-baseline justify-between">
                 <div className="text-2xl font-bold font-mono text-white tracking-tight">
                   {loadingDisputes ? "..." : totalDisputesCount}
                 </div>
-                <span className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                <span className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                   <ArrowDownRight className="w-3 h-3 mr-0.5" />
                   -28% 7d
                 </span>
@@ -133,7 +135,7 @@ export default function DashboardPage() {
             </div>
 
             {/* 7-Day Trendline Micro-Sparkline */}
-            <div className="mt-3 pt-2 border-t border-slate-800/80">
+            <div className="mt-3 pt-2.5 border-t border-white/[0.05]">
               <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mb-1">
                 <span>7-Day Ingestion Trend</span>
                 <span className="text-slate-400">Past Week</span>
@@ -143,17 +145,19 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 2: Autonomous Contest Rate */}
-          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between hover:border-slate-700 transition">
+          <div className="rounded-3xl p-5 bg-zinc-900/40 backdrop-blur-2xl border border-white/[0.06] shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col justify-between hover:border-white/[0.12] transition-all duration-300">
             <div>
               <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
                 <span className="font-medium">Autonomous Contest Rate</span>
-                <Zap className="w-4 h-4 text-emerald-400" />
+                <div className="w-7 h-7 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Zap className="w-4 h-4" />
+                </div>
               </div>
               <div className="flex items-baseline justify-between">
                 <div className="text-2xl font-bold font-mono text-emerald-400 tracking-tight">
                   {loadingDisputes ? "..." : `${autoSubmitRate.toFixed(0)}%`}
                 </div>
-                <span className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                <span className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                   <ArrowUpRight className="w-3 h-3 mr-0.5" />
                   +24% 7d
                 </span>
@@ -162,7 +166,7 @@ export default function DashboardPage() {
             </div>
 
             {/* 7-Day Trendline Micro-Sparkline */}
-            <div className="mt-3 pt-2 border-t border-slate-800/80">
+            <div className="mt-3 pt-2.5 border-t border-white/[0.05]">
               <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mb-1">
                 <span>7-Day AI Auto-Submit Rate</span>
                 <span className="text-emerald-400 font-semibold">Rising</span>
@@ -172,17 +176,19 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 3: Capital Contested */}
-          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between hover:border-slate-700 transition">
+          <div className="rounded-3xl p-5 bg-zinc-900/40 backdrop-blur-2xl border border-white/[0.06] shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col justify-between hover:border-white/[0.12] transition-all duration-300">
             <div>
               <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
                 <span className="font-medium">Capital Under Dispute</span>
-                <TrendingUp className="w-4 h-4 text-cyan-400" />
+                <div className="w-7 h-7 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
               </div>
               <div className="flex items-baseline justify-between">
                 <div className="text-2xl font-bold font-mono text-white tracking-tight">
                   {loadingDisputes ? "..." : `₹${totalCapitalAtRisk.toLocaleString("en-IN")}`}
                 </div>
-                <span className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                <span className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                   <TrendingDown className="w-3 h-3 mr-0.5" />
                   -45% Risk
                 </span>
@@ -191,7 +197,7 @@ export default function DashboardPage() {
             </div>
 
             {/* 7-Day Trendline Micro-Sparkline */}
-            <div className="mt-3 pt-2 border-t border-slate-800/80">
+            <div className="mt-3 pt-2.5 border-t border-white/[0.05]">
               <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mb-1">
                 <span>7-Day Capital Exposure</span>
                 <span className="text-cyan-400">Mitigated</span>
@@ -201,17 +207,19 @@ export default function DashboardPage() {
           </div>
 
           {/* Card 4: Bot Attacks Intercepted */}
-          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between hover:border-slate-700 transition">
+          <div className="rounded-3xl p-5 bg-zinc-900/40 backdrop-blur-2xl border border-white/[0.06] shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col justify-between hover:border-white/[0.12] transition-all duration-300">
             <div>
               <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
                 <span className="font-medium">Bot Attacks Intercepted</span>
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <div className="w-7 h-7 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
               </div>
               <div className="flex items-baseline justify-between">
                 <div className="text-2xl font-bold font-mono text-rose-400 tracking-tight">
                   {loadingLogs ? "..." : totalBotAttacks}
                 </div>
-                <span className="flex items-center text-[10px] font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+                <span className="flex items-center text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
                   <ArrowDownRight className="w-3 h-3 mr-0.5" />
                   -64% Bursts
                 </span>
@@ -220,7 +228,7 @@ export default function DashboardPage() {
             </div>
 
             {/* 7-Day Trendline Micro-Sparkline */}
-            <div className="mt-3 pt-2 border-t border-slate-800/80">
+            <div className="mt-3 pt-2.5 border-t border-white/[0.05]">
               <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mb-1">
                 <span>7-Day Velocity Interceptions</span>
                 <span className="text-rose-400">Suppressed</span>
@@ -242,8 +250,8 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
-        RazorSentinel · Multimodal Dispute-Evidence Assistant & Preemptive Velocity Shield · Razorpay Hackathon 2026
+      <footer className="border-t border-white/[0.06] py-6 text-center text-xs text-slate-500">
+        razor-EZ · Autonomous Dispute Defense & Preemptive Velocity Shield · Razorpay Hackathon 2026
       </footer>
     </div>
   );
