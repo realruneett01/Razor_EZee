@@ -113,18 +113,9 @@ export const Sparkline: React.FC<SparklineProps> = ({
           strokeLinejoin="round"
         />
 
-        {/* Pulsing latest point dot */}
-        <circle cx={lastPoint.x} cy={lastPoint.y} r="3" fill={conf.dot} />
-        <circle
-          cx={lastPoint.x}
-          cy={lastPoint.y}
-          r="5"
-          fill="none"
-          stroke={conf.stroke}
-          strokeWidth="1"
-          opacity="0.6"
-          className="animate-ping origin-center"
-        />
+        {/* Latest point dot with clean glow */}
+        <circle cx={lastPoint.x} cy={lastPoint.y} r="3" fill="#ffffff" />
+        <circle cx={lastPoint.x} cy={lastPoint.y} r="1.5" fill={conf.dot} />
       </svg>
     </div>
   );

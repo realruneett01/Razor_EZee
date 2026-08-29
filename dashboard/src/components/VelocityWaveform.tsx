@@ -326,34 +326,38 @@ export const VelocityWaveform: React.FC<VelocityWaveformProps> = ({
             className="transition-all duration-300"
           />
 
-          {/* Micro Challenge Spark Nodes */}
+          {/* Challenge & Review Peak Nodes (Clean without detached rings) */}
           {coords.map((pt, i) => {
             if (pt.challenged > 0) {
               return (
-                <g key={i}>
-                  <circle cx={pt.x} cy={pt.y} r="4" fill="#f43f5e" />
-                  <circle cx={pt.x} cy={pt.y} r="8" fill="none" stroke="#f43f5e" strokeWidth="1" opacity="0.6" className="animate-ping" />
-                </g>
+                <circle
+                  key={i}
+                  cx={pt.x}
+                  cy={pt.y}
+                  r="3.5"
+                  fill="#f43f5e"
+                  stroke="#ffffff"
+                  strokeWidth="1"
+                />
               );
             }
             if (pt.flagged > 0) {
-              return <circle key={i} cx={pt.x} cy={pt.y} r="3" fill="#f59e0b" opacity="0.8" />;
+              return (
+                <circle
+                  key={i}
+                  cx={pt.x}
+                  cy={pt.y}
+                  r="2.5"
+                  fill="#f59e0b"
+                />
+              );
             }
             return null;
           })}
 
-          {/* Live-Head Pulsing Beacon Node */}
-          <circle cx={lastPt.x} cy={lastPt.y} r="4.5" fill="#ffffff" />
-          <circle
-            cx={lastPt.x}
-            cy={lastPt.y}
-            r="9"
-            fill="none"
-            stroke={isSimulatingBurst ? "#f43f5e" : "#22d3ee"}
-            strokeWidth="2"
-            className="animate-ping"
-            style={{ transformOrigin: `${lastPt.x}px ${lastPt.y}px` }}
-          />
+          {/* Live-Head Lead Node (Clean solid node with glow) */}
+          <circle cx={lastPt.x} cy={lastPt.y} r="5" fill="#ffffff" filter="url(#neonGlow)" />
+          <circle cx={lastPt.x} cy={lastPt.y} r="2.5" fill={isSimulatingBurst ? "#f43f5e" : "#06b6d4"} />
         </svg>
 
         {/* Minimal Floating Threshold Badges */}
