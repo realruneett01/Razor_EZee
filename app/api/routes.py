@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
+from app.config import settings
 from app.db.client import get_supabase_client
 from app.engines.velocity.ratio_monitor import get_dispute_ratio_report
 
@@ -15,6 +16,26 @@ logger = logging.getLogger("razorsentinel.api")
 # Local fallback store for in-memory or local file sync when Supabase is offline
 LOCAL_DISPUTES: List[Dict[str, Any]] = []
 LOCAL_VELOCITY_LOGS: List[Dict[str, Any]] = []
+
+
+@router.get("/system/status")
+def get_system_status() -> Dict[str, Any]:
+    """Returns configuration health status with ZERO secrets exposed."""
+    return {
+        "app_name": settings.app_name,
+        "app_version": settings.app_version,
+        "zero_secrets_guarantee": True,
+        "credentials": {
+            "razorpay_configured": bool(settings.razorpay_key_id and settings.razorpay_key_secret),
+            "razorpay_key_id_masked": f"{settings.razorpay_key_id[:8]}..." if settings.razorpay_key_id else "NOT_CONFIGURED",
+            "webhook_secret_configured": bool(settings.razorpay_webhook_secret),
+            "gemini_configured": bool(settings.gemini_api_key),
+            "gemini_model": settings.gemini_model,
+            "upstash_redis_configured": bool(settings.upstash_redis_rest_url and settings.upstash_redis_rest_token),
+            "supabase_configured": bool(settings.supabase_url and settings.supabase_key),
+        },
+        "server_time_utc": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/disputes")
