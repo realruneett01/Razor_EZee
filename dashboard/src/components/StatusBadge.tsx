@@ -1,4 +1,3 @@
-// components/StatusBadge.tsx
 import React from "react";
 import { formatVerdict, RiskVerdict } from "@/lib/formatters";
 
@@ -11,22 +10,20 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ 
   verdict, 
-  showDot = true,
+  showDot = false,
   showSublabel = false,
   className = ""
 }: StatusBadgeProps) {
   const config = formatVerdict(verdict);
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${config.badgeClass} ${className}`}
-    >
+    <span className={`${config.badgeClass} ${className}`}>
       {showDot && (
-        <span className={`w-1.5 h-1.5 rounded-full ${config.dotClass}`} />
+        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 inline-block ${config.dotClass}`} />
       )}
       <span>{config.label}</span>
       {showSublabel && config.sublabel && (
-        <span className="opacity-75 text-[10px] hidden sm:inline">({config.sublabel})</span>
+        <span className="opacity-75 text-[10px] hidden sm:inline ml-1">({config.sublabel})</span>
       )}
     </span>
   );

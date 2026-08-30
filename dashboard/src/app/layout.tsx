@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "razor-EZ — Autonomous Dispute Defense & Preemptive Velocity Shield",
-  description: "Multimodal Evidence Triangulation & Real-Time Velocity Shield for Razorpay Merchants",
+  title: "razor·ez — Autonomous Risk & Dispute Defense",
+  description: "Autonomous Risk & Dispute Defense · Preemptive Velocity Shield · Razorpay",
 };
 
 export default function RootLayout({
@@ -12,8 +12,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-[#060911] text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>
         {children}
       </body>
     </html>
