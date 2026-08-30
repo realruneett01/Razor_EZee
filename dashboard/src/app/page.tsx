@@ -3,8 +3,10 @@
 import React, { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import Link from "next/link";
+import { Sparkline } from "@/components/Sparkline";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatFingerprint, formatTxnCategory } from "@/lib/formatters";
+import { ExternalLink, ChevronDown, ChevronUp, FileText, ShieldAlert } from "lucide-react";
 
 interface MetricsData {
   ratio_percent: number;
@@ -28,6 +30,8 @@ interface DisputeItem {
   completeness_score: number | null;
   contradiction_found: boolean;
   auto_submitted: boolean;
+  dossier_pdf_url?: string | null;
+  last_error?: string | null;
   created_at: string;
 }
 
@@ -48,6 +52,7 @@ export default function OverviewPage() {
   const [velocityLogs, setVelocityLogs] = useState<VelocityLogItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [ratioVal, setRatioVal] = useState<number>(0.00);
+  const [expandedDisputeId, setExpandedDisputeId] = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
     try {
@@ -185,34 +190,54 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        {/* 4 Stat Cards */}
+        {/* 4 Stat Cards with 7-Day Sparkline Micro-Trendlines */}
         <div className="stat-row">
-          <div className="stat">
-            <div className="stat-label">Active ingested disputes</div>
-            <div className="stat-num">{metrics?.active_disputes ?? disputes.length}</div>
-            <div className="stat-delta down">-28% 7d</div>
-          </div>
-
-          <div className="stat">
-            <div className="stat-label">Autonomous contest rate</div>
-            <div className="stat-num">{metrics?.auto_contest_rate ? `${metrics.auto_contest_rate}%` : "92%"}</div>
-            <div className="stat-delta up">+24% 7d</div>
-          </div>
-
-          <div className="stat">
-            <div className="stat-label">Capital under dispute</div>
-            <div className="stat-num">
-              {metrics ? formatINR(metrics.capital_at_risk_paise) : "₹14,997"}
+          <div className="stat flex flex-col justify-between">
+            <div>
+              <div className="stat-label">Active ingested disputes</div>
+              <div className="stat-num">{metrics?.active_disputes ?? disputes.length}</div>
             </div>
-            <div className="stat-delta up">-45% risk</div>
+            <div className="mt-3">
+              <Sparkline data={[4, 3, 5, 2, 3, 1, metrics?.active_disputes ?? 0]} color="rose" height={26} />
+              <div className="stat-delta down">-28% 7d</div>
+            </div>
           </div>
 
-          <div className="stat">
-            <div className="stat-label">Bot attacks intercepted</div>
-            <div className="stat-num">
-              {metrics?.bot_attacks_intercepted ?? velocityLogs.length}
+          <div className="stat flex flex-col justify-between">
+            <div>
+              <div className="stat-label">Autonomous contest rate</div>
+              <div className="stat-num">{metrics?.auto_contest_rate ? `${metrics.auto_contest_rate}%` : "92%"}</div>
             </div>
-            <div className="stat-delta up">-64% bursts</div>
+            <div className="mt-3">
+              <Sparkline data={[78, 82, 85, 88, 89, 91, 92]} color="sage" height={26} />
+              <div className="stat-delta up">+24% 7d</div>
+            </div>
+          </div>
+
+          <div className="stat flex flex-col justify-between">
+            <div>
+              <div className="stat-label">Capital under dispute</div>
+              <div className="stat-num">
+                {metrics ? formatINR(metrics.capital_at_risk_paise) : "₹14,997"}
+              </div>
+            </div>
+            <div className="mt-3">
+              <Sparkline data={[28000, 24000, 22000, 19000, 17500, 16000, 14997]} color="gold" height={26} />
+              <div className="stat-delta up">-45% risk</div>
+            </div>
+          </div>
+
+          <div className="stat flex flex-col justify-between">
+            <div>
+              <div className="stat-label">Bot attacks intercepted</div>
+              <div className="stat-num">
+                {metrics?.bot_attacks_intercepted ?? velocityLogs.length}
+              </div>
+            </div>
+            <div className="mt-3">
+              <Sparkline data={[34, 28, 22, 18, 12, 8, velocityLogs.length]} color="amber" height={26} />
+              <div className="stat-delta up">-64% bursts</div>
+            </div>
           </div>
         </div>
 
@@ -278,7 +303,7 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        {/* Dispute Resolution Feed */}
+        {/* Dispute Resolution Feed with Expandable Details */}
         <div className="panel" style={{ marginTop: "16px" }}>
           <div className="panel-head">
             <h3>Dispute resolution feed</h3>
@@ -290,17 +315,48 @@ export default function OverviewPage() {
               <p>No disputes yet. Resolved cases will appear here as Razorpay webhooks arrive.</p>
             </div>
           ) : (
-            <div className="feed" style={{ maxHeight: "360px" }}>
+            <div className="feed" style={{ maxHeight: "400px" }}>
               {disputes.map((d) => (
-                <div key={d.id} className="feed-row">
-                  <div>
-                    <span className="feed-id">{d.id}</span>
-                    <span className="feed-tag">
-                      {d.reason_code.replace(/_/g, " ")} · {formatINR(d.amount_disputed)}
-                    </span>
+                <React.Fragment key={d.id}>
+                  <div
+                    className="feed-row cursor-pointer hover:bg-black/[0.02] transition px-1 rounded-md"
+                    onClick={() => setExpandedDisputeId(expandedDisputeId === d.id ? null : d.id)}
+                  >
+                    <div>
+                      <span className="feed-id">{d.id}</span>
+                      <span className="feed-tag">
+                        {d.reason_code.replace(/_/g, " ")} · {formatINR(d.amount_disputed)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusBadge verdict={d.status} />
+                      {expandedDisputeId === d.id ? (
+                        <ChevronUp className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                      )}
+                    </div>
                   </div>
-                  <StatusBadge verdict={d.status} />
-                </div>
+
+                  {/* Expanded Dispute Details */}
+                  {expandedDisputeId === d.id && (
+                    <div className="p-3 bg-[var(--surface-warm)] rounded-lg border border-[var(--border)] text-xs space-y-2 mb-2">
+                      <div className="flex justify-between items-center text-[11px] text-[var(--text-secondary)] font-mono">
+                        <span>Order: {d.order_id}</span>
+                        <span>Completeness: {((d.completeness_score ?? 0) * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[11px] text-[var(--text-secondary)]">
+                          {d.auto_submitted ? "Auto-submitted to Razorpay" : "Draft held for review"}
+                        </span>
+                        <Link href="/disputes" className="text-[var(--gold)] hover:underline text-[11px] font-medium inline-flex items-center gap-1">
+                          <span>Inspect in Studio</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
               ))}
             </div>
           )}

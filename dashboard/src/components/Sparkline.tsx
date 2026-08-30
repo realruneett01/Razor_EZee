@@ -4,47 +4,59 @@ import React from "react";
 
 interface SparklineProps {
   data: number[];
-  color: "indigo" | "emerald" | "cyan" | "rose" | "amber";
+  color?: "gold" | "sage" | "amber" | "burgundy" | "rose" | "indigo" | "cyan";
   height?: number;
   className?: string;
 }
 
-const COLOR_MAP = {
-  indigo: {
-    stroke: "#818cf8",
-    fillStart: "rgba(129, 140, 248, 0.4)",
-    fillEnd: "rgba(129, 140, 248, 0.0)",
-    dot: "#a5b4fc",
+const COLOR_MAP: Record<string, { stroke: string; fillStart: string; fillEnd: string; dot: string }> = {
+  gold: {
+    stroke: "#B07D3A",
+    fillStart: "rgba(176, 125, 58, 0.25)",
+    fillEnd: "rgba(176, 125, 58, 0.0)",
+    dot: "#B07D3A",
   },
-  emerald: {
-    stroke: "#34d399",
-    fillStart: "rgba(52, 211, 153, 0.4)",
-    fillEnd: "rgba(52, 211, 153, 0.0)",
-    dot: "#6ee7b7",
-  },
-  cyan: {
-    stroke: "#22d3ee",
-    fillStart: "rgba(34, 211, 238, 0.4)",
-    fillEnd: "rgba(34, 211, 238, 0.0)",
-    dot: "#67e8f9",
-  },
-  rose: {
-    stroke: "#fb7185",
-    fillStart: "rgba(251, 113, 133, 0.4)",
-    fillEnd: "rgba(251, 113, 133, 0.0)",
-    dot: "#fda4af",
+  sage: {
+    stroke: "#5A8A5A",
+    fillStart: "rgba(90, 138, 90, 0.25)",
+    fillEnd: "rgba(90, 138, 90, 0.0)",
+    dot: "#5A8A5A",
   },
   amber: {
-    stroke: "#fbbf24",
-    fillStart: "rgba(251, 191, 36, 0.4)",
-    fillEnd: "rgba(251, 191, 36, 0.0)",
-    dot: "#fde68a",
+    stroke: "#B8860B",
+    fillStart: "rgba(184, 134, 11, 0.25)",
+    fillEnd: "rgba(184, 134, 11, 0.0)",
+    dot: "#B8860B",
+  },
+  burgundy: {
+    stroke: "#8B3A3A",
+    fillStart: "rgba(139, 58, 58, 0.25)",
+    fillEnd: "rgba(139, 58, 58, 0.0)",
+    dot: "#8B3A3A",
+  },
+  rose: {
+    stroke: "#A04040",
+    fillStart: "rgba(160, 64, 64, 0.25)",
+    fillEnd: "rgba(160, 64, 64, 0.0)",
+    dot: "#A04040",
+  },
+  indigo: {
+    stroke: "#6E473B",
+    fillStart: "rgba(110, 71, 59, 0.25)",
+    fillEnd: "rgba(110, 71, 59, 0.0)",
+    dot: "#6E473B",
+  },
+  cyan: {
+    stroke: "#B07D3A",
+    fillStart: "rgba(176, 125, 58, 0.25)",
+    fillEnd: "rgba(176, 125, 58, 0.0)",
+    dot: "#B07D3A",
   },
 };
 
 export const Sparkline: React.FC<SparklineProps> = ({
   data,
-  color,
+  color = "gold",
   height = 36,
   className = "",
 }) => {
@@ -66,7 +78,7 @@ export const Sparkline: React.FC<SparklineProps> = ({
     return { x, y };
   });
 
-  // Construct smooth bezier curve path
+  // Smooth bezier curve path
   const pathD = points.reduce((acc, point, i, arr) => {
     if (i === 0) return `M ${point.x},${point.y}`;
     const prev = arr[i - 1];
@@ -81,8 +93,7 @@ export const Sparkline: React.FC<SparklineProps> = ({
   const firstPoint = points[0];
 
   const areaD = `${pathD} L ${lastPoint.x},${height} L ${firstPoint.x},${height} Z`;
-
-  const conf = COLOR_MAP[color] || COLOR_MAP.indigo;
+  const conf = COLOR_MAP[color] || COLOR_MAP.gold;
   const gradId = `sparkline-grad-${color}-${Math.random().toString(36).substr(2, 6)}`;
 
   return (
@@ -108,12 +119,12 @@ export const Sparkline: React.FC<SparklineProps> = ({
           d={pathD}
           fill="none"
           stroke={conf.stroke}
-          strokeWidth="2"
+          strokeWidth="1.75"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
 
-        {/* Latest point dot with clean glow */}
+        {/* Latest point dot */}
         <circle cx={lastPoint.x} cy={lastPoint.y} r="3" fill="#ffffff" />
         <circle cx={lastPoint.x} cy={lastPoint.y} r="1.5" fill={conf.dot} />
       </svg>
