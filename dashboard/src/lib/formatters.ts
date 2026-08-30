@@ -1,4 +1,4 @@
-// lib/formatters.ts - Central Formatter Utility for Fintech Copy Modernization
+// lib/formatters.ts - Central Formatter Utility for Warm Editorial Fintech Palette
 
 export type RiskVerdict = 
   | "ALLOW" 
@@ -42,9 +42,9 @@ export function formatVerdict(verdict: RiskVerdict): VerdictConfig {
   if (!verdict) {
     return {
       label: "Verified",
-      sublabel: "Frictionless Checkout",
-      badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-      dotClass: "bg-emerald-400",
+      sublabel: "Standard Flow",
+      badgeClass: "badge verified border border-[var(--sage)]/20",
+      dotClass: "bg-[var(--sage)]",
     };
   }
 
@@ -58,9 +58,9 @@ export function formatVerdict(verdict: RiskVerdict): VerdictConfig {
     case "WON":
       return {
         label: "Verified",
-        sublabel: "Frictionless Checkout",
-        badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-        dotClass: "bg-emerald-400",
+        sublabel: "Frictionless Flow",
+        badgeClass: "badge verified border border-[var(--sage)]/20",
+        dotClass: "bg-[var(--sage)]",
       };
 
     case "FLAG_REVIEW":
@@ -71,10 +71,10 @@ export function formatVerdict(verdict: RiskVerdict): VerdictConfig {
     case "PENDING_REVIEW":
     case "PENDING":
       return {
-        label: "Flagged for Review",
-        sublabel: "Monitored Transaction",
-        badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-        dotClass: "bg-amber-400",
+        label: "Flagged",
+        sublabel: "Monitored",
+        badgeClass: "badge review border border-[var(--amber)]/20",
+        dotClass: "bg-[var(--amber)]",
       };
 
     case "OTP_CHALLENGE":
@@ -83,21 +83,22 @@ export function formatVerdict(verdict: RiskVerdict): VerdictConfig {
     case "STEP_UP_VERIFICATION":
     case "STEP_UP_OTP":
     case "STEP_UP_CHALLENGE":
+    case "STEP_UP":
       return {
-        label: "Step-Up Verification",
-        sublabel: "Friction Triggered (OTP)",
-        badgeClass: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-        dotClass: "bg-rose-400",
+        label: "Step-up",
+        sublabel: "OTP Friction",
+        badgeClass: "badge step border border-[var(--burgundy)]/20",
+        dotClass: "bg-[var(--burgundy)]",
       };
 
     case "CHARGEBACK_RISK":
     case "ELEVATED_RISK":
     case "RISK":
       return {
-        label: "Elevated Dispute Risk",
-        sublabel: "Preemptive Representment",
-        badgeClass: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-        dotClass: "bg-orange-400",
+        label: "Elevated Risk",
+        sublabel: "Preemptive",
+        badgeClass: "text-[var(--gold)] bg-[var(--gold-soft)] border border-[var(--gold)]/20 badge",
+        dotClass: "bg-[var(--gold)]",
       };
 
     case "BLOCK":
@@ -107,50 +108,49 @@ export function formatVerdict(verdict: RiskVerdict): VerdictConfig {
       return {
         label: "Blocked",
         sublabel: "Prevented",
-        badgeClass: "bg-red-500/15 text-red-300 border-red-500/30",
-        dotClass: "bg-red-400",
+        badgeClass: "text-[var(--rose)] bg-[var(--rose-soft)] border border-[var(--rose)]/20 badge",
+        dotClass: "bg-[var(--rose)]",
       };
 
     default:
-      // Fallback for any unanticipated strings
       return {
         label: normalized.replace(/_/g, " "),
-        badgeClass: "bg-zinc-800 text-zinc-300 border-zinc-700",
-        dotClass: "bg-zinc-400",
+        badgeClass: "bg-black/5 text-[var(--text-secondary)] border border-[var(--border)] badge",
+        dotClass: "bg-[var(--text-secondary)]",
       };
   }
 }
 
 export function formatTxnCategory(category: TxnCategory): string {
-  if (!category) return "Regular Checkout";
+  if (!category) return "regular checkout";
   const normalized = category.toUpperCase().trim().replace(/[\s-]+/g, "_");
   
   switch (normalized) {
     case "MICRO_TXN":
     case "MICRO_PROBE":
     case "MICRO":
-      return "Micro-Probe";
+      return "micro-probe";
     case "BURST":
     case "VELOCITY_SURGE":
     case "VELOCITY_BURST":
-      return "Velocity Surge";
+      return "velocity surge";
     case "STANDARD":
     case "REGULAR":
     case "NORMAL":
-      return "Regular Checkout";
+      return "regular checkout";
     case "CHARGEBACK_RISK":
     case "DISPUTE_RISK":
-      return "Elevated Risk";
+      return "elevated risk";
     default:
-      return category.replace(/_/g, " ");
+      return category.replace(/_/g, " ").toLowerCase();
   }
 }
 
 export function formatFingerprint(hash: string): string {
-  if (!hash) return "Device · ID";
+  if (!hash) return "dev·0000";
   if (hash.startsWith("fp_")) {
     const raw = hash.slice(3);
-    return `Device · ${raw.slice(0, 4)}…${raw.slice(-4)}`;
+    return `${raw.slice(0, 4)}…${raw.slice(-4)}`;
   }
-  return hash.length > 12 ? `Device · ${hash.slice(0, 6)}…${hash.slice(-4)}` : hash;
+  return hash.length > 8 ? `${hash.slice(0, 4)}…${hash.slice(-4)}` : hash;
 }
