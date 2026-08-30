@@ -87,7 +87,7 @@ export default function VelocityShieldPage() {
     return () => clearInterval(rpsTimer);
   }, []);
 
-  // Waveform canvas animation
+  // Fluid travelling waveform canvas animation
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -95,24 +95,29 @@ export default function VelocityShieldPage() {
     if (!ctx) return;
 
     let animId: number;
-    const W = 900;
-    const H = 200;
-    canvas.width = W;
-    canvas.height = H;
 
-    const wavePoints: { base: number; offset: number; phase: number }[] = [];
-    for (let i = 0; i < 140; i++) {
-      wavePoints.push({
-        base: Math.sin(i * 0.12) * 18 + Math.sin(i * 0.04) * 8 + Math.cos(i * 0.07) * 5,
-        offset: Math.random() * 5 - 2.5,
-        phase: Math.random() * Math.PI * 2,
-      });
-    }
+    const resizeCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = (rect.height || 200) * dpr;
+      ctx.scale(dpr, dpr);
+    };
+
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    const numPoints = 120;
+    const startTime = Date.now();
 
     const draw = () => {
+      const rect = canvas.getBoundingClientRect();
+      const W = rect.width || 900;
+      const H = rect.height || 200;
+
       ctx.clearRect(0, 0, W, H);
 
-      // Grid
+      // Grid background lines
       ctx.strokeStyle = "rgba(41,28,14,0.04)";
       ctx.lineWidth = 1;
       for (let y = 25; y < H; y += 28) {
@@ -128,37 +133,89 @@ export default function VelocityShieldPage() {
         ctx.stroke();
       }
 
-      // Threshold lines
+      // Threshold reference lines
       ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = "rgba(160,64,64,0.15)";
+      // Danger / Step-up threshold (>18/min)
+      ctx.strokeStyle = "rgba(160,64,64,0.22)";
       ctx.beginPath();
-      ctx.moveTo(0, H * 0.32);
-      ctx.lineTo(W, H * 0.32);
+      ctx.moveTo(0, H * 0.28);
+      ctx.lineTo(W, H * 0.28);
       ctx.stroke();
-      ctx.strokeStyle = "rgba(184,134,11,0.15)";
+
+      // Warning / Monitored threshold (>12/min)
+      ctx.strokeStyle = "rgba(184,134,11,0.22)";
       ctx.beginPath();
-      ctx.moveTo(0, H * 0.50);
-      ctx.lineTo(W, H * 0.50);
+      ctx.moveTo(0, H * 0.48);
+      ctx.lineTo(W, H * 0.48);
       ctx.stroke();
       ctx.setLineDash([]);
 
       // Parallax lerp
-      mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.035;
-      mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.035;
-      const px = (mouseRef.current.x - 0.5) * 18;
-      const py = (mouseRef.current.y - 0.5) * 8;
-      const t = Date.now() * 0.001;
+      mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.04;
+      mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.04;
+      const px = (mouseRef.current.x - 0.5) * 16;
+      const py = (mouseRef.current.y - 0.5) * 10;
 
-      // Glow line
+      // Elapsed time in seconds for continuous wave travelling
+      const elapsed = (Date.now() - startTime) * 0.001;
+
+      // Calculate wave points with horizontal phase propagation (travelling from right to left)
+      const points: { x: number; y: number }[] = [];
+      const echoPoints: { x: number; y: number }[] = [];
+
+      for (let i = 0; i < numPoints; i++) {
+        const x = (i / (numPoints - 1)) * W + px;
+
+        // Harmonic traveling wave equation
+        const wave1 = Math.sin(i * 0.09 - elapsed * 2.2) * 16;
+        const wave2 = Math.sin(i * 0.04 - elapsed * 1.1) * 9;
+        const wave3 = Math.cos(i * 0.16 - elapsed * 2.8) * 5;
+        const microNoise = Math.sin(elapsed * 3.5 + i * 0.3) * 3;
+
+        // Attack spike profile (centered at index 65)
+        const spike = spikeEnergyRef.current * Math.exp(-Math.pow(i - 65, 2) / 140) * 60;
+
+        const y = H * 0.62 + wave1 + wave2 + wave3 + microNoise - spike + py;
+        points.push({ x, y });
+
+        // Trailing echo wave (secondary ripple)
+        const echoWave = Math.sin(i * 0.07 - elapsed * 1.8 + 0.8) * 11;
+        const echoY = H * 0.62 + echoWave + 16 - spike * 0.5 + py;
+        echoPoints.push({ x, y: echoY });
+      }
+
+      // 1. Fill Area Gradient beneath the main line
       ctx.beginPath();
-      for (let i = 0; i < wavePoints.length; i++) {
-        const x = (i / (wavePoints.length - 1)) * W + px;
-        const p = wavePoints[i];
-        const noise = Math.sin(t + p.phase + i * 0.15) * 3.5;
-        const spike = spikeEnergyRef.current * Math.exp(-Math.pow(i - 70, 2) / 180) * 50;
-        const y = H / 2 + p.base + p.offset + noise + spike + py;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+      for (let i = 0; i < points.length; i++) {
+        if (i === 0) ctx.moveTo(points[i].x, points[i].y);
+        else ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.lineTo(W + px, H);
+      ctx.lineTo(px, H);
+      ctx.closePath();
+
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, "rgba(176,125,58,0.08)");
+      grad.addColorStop(0.5, "rgba(176,125,58,0.03)");
+      grad.addColorStop(1, "rgba(176,125,58,0.0)");
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // 2. Trailing Echo Line
+      ctx.beginPath();
+      for (let i = 0; i < echoPoints.length; i++) {
+        if (i === 0) ctx.moveTo(echoPoints[i].x, echoPoints[i].y);
+        else ctx.lineTo(echoPoints[i].x, echoPoints[i].y);
+      }
+      ctx.strokeStyle = "rgba(176,125,58,0.18)";
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+
+      // 3. Glow Stroke Layer
+      ctx.beginPath();
+      for (let i = 0; i < points.length; i++) {
+        if (i === 0) ctx.moveTo(points[i].x, points[i].y);
+        else ctx.lineTo(points[i].x, points[i].y);
       }
       ctx.strokeStyle = "rgba(176,125,58,0.15)";
       ctx.lineWidth = 6;
@@ -166,88 +223,53 @@ export default function VelocityShieldPage() {
       ctx.lineJoin = "round";
       ctx.stroke();
 
-      // Main line
+      // 4. Main Line with Glow Shadow
       ctx.beginPath();
-      for (let i = 0; i < wavePoints.length; i++) {
-        const x = (i / (wavePoints.length - 1)) * W + px;
-        const p = wavePoints[i];
-        const noise = Math.sin(t + p.phase + i * 0.15) * 3.5;
-        const spike = spikeEnergyRef.current * Math.exp(-Math.pow(i - 70, 2) / 180) * 50;
-        const y = H / 2 + p.base + p.offset + noise + spike + py;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+      for (let i = 0; i < points.length; i++) {
+        if (i === 0) ctx.moveTo(points[i].x, points[i].y);
+        else ctx.lineTo(points[i].x, points[i].y);
       }
       ctx.strokeStyle = "#B07D3A";
       ctx.lineWidth = 2.2;
-      ctx.shadowColor = "rgba(176,125,58,0.25)";
-      ctx.shadowBlur = 10;
+      ctx.shadowColor = "rgba(176,125,58,0.30)";
+      ctx.shadowBlur = 8;
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Echo line
-      ctx.beginPath();
-      for (let i = 0; i < wavePoints.length; i++) {
-        const x = (i / (wavePoints.length - 1)) * W + px;
-        const p = wavePoints[i];
-        const noise = Math.sin(t * 0.8 + p.phase * 0.7 + i * 0.12) * 2.5;
-        const spike = spikeEnergyRef.current * Math.exp(-Math.pow(i - 70, 2) / 220) * 30;
-        const y = H / 2 + p.base * 0.5 + noise + spike * 0.6 + py + 18;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = "rgba(176,125,58,0.15)";
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
+      // 5. Active Streaming Edge Indicator Dot (latest sample on the right)
+      const lastPt = points[points.length - 1];
+      if (lastPt) {
+        ctx.beginPath();
+        ctx.arc(lastPt.x - 2, lastPt.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = "#B07D3A";
+        ctx.fill();
 
-      // Fill gradient
-      ctx.beginPath();
-      for (let i = 0; i < wavePoints.length; i++) {
-        const x = (i / (wavePoints.length - 1)) * W + px;
-        const p = wavePoints[i];
-        const noise = Math.sin(t + p.phase + i * 0.15) * 3.5;
-        const spike = spikeEnergyRef.current * Math.exp(-Math.pow(i - 70, 2) / 180) * 50;
-        const y = H / 2 + p.base + p.offset + noise + spike + py;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        ctx.beginPath();
+        ctx.arc(lastPt.x - 2, lastPt.y, 8, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(176,125,58,0.35)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       }
-      ctx.lineTo(W + px, H);
-      ctx.lineTo(px, H);
-      ctx.closePath();
-      const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, "rgba(176,125,58,0.06)");
-      grad.addColorStop(0.6, "rgba(176,125,58,0.02)");
-      grad.addColorStop(1, "rgba(176,125,58,0)");
-      ctx.fillStyle = grad;
-      ctx.fill();
 
-      // Spark particles on spike
-      if (spikeEnergyRef.current > 0.3) {
-        for (let k = 0; k < 5; k++) {
-          const si = 70 + Math.floor((Math.random() - 0.5) * 30);
-          if (si >= 0 && si < wavePoints.length) {
-            const sx = (si / (wavePoints.length - 1)) * W + px;
-            const sy =
-              H / 2 +
-              wavePoints[si].base +
-              wavePoints[si].offset +
-              py +
-              Math.sin(t + wavePoints[si].phase + si * 0.15) * 3.5 +
-              spikeEnergyRef.current * Math.exp(-Math.pow(si - 70, 2) / 180) * 50;
+      // 6. Spark particle burst emissions on attack injection
+      if (spikeEnergyRef.current > 0.2) {
+        for (let k = 0; k < 6; k++) {
+          const si = 65 + Math.floor((Math.random() - 0.5) * 24);
+          if (si >= 0 && si < points.length) {
+            const sx = points[si].x + (Math.random() * 24 - 12);
+            const sy = points[si].y + (Math.random() * 20 - 10);
+            const r = Math.random() * 1.8 + 0.8;
             ctx.beginPath();
-            ctx.arc(
-              sx + Math.random() * 20 - 10,
-              sy + Math.random() * 20 - 10,
-              Math.random() * 1.5 + 0.5,
-              0,
-              Math.PI * 2
-            );
-            ctx.fillStyle = `rgba(176,125,58,${spikeEnergyRef.current * 0.4})`;
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(176,125,58,${spikeEnergyRef.current * 0.6})`;
             ctx.fill();
           }
         }
       }
 
-      spikeEnergyRef.current *= 0.93;
+      // Smooth exponential decay of attack spike energy
+      spikeEnergyRef.current *= 0.94;
+
       animId = requestAnimationFrame(draw);
     };
 
@@ -268,6 +290,7 @@ export default function VelocityShieldPage() {
 
     return () => {
       cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resizeCanvas);
       canvas.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("mouseleave", handleMouseLeave);
     };
@@ -284,12 +307,11 @@ export default function VelocityShieldPage() {
 
   const injectAttack = async (type: "sweep" | "burst" | "standard") => {
     setSimulating(true);
-    spikeEnergyRef.current = 1;
 
     if (type === "sweep") {
-      // Step through 5 micro-probes sequentially
+      // Step through 5 micro-probes sequentially with spike pulses
       for (let i = 1; i <= 5; i++) {
-        spikeEnergyRef.current = 0.8 + i * 0.1;
+        spikeEnergyRef.current = 0.7 + i * 0.12;
         const action = i >= 5 ? "OTP_CHALLENGE" : i >= 3 ? "FLAG_REVIEW" : "ALLOW";
         const label = i >= 5 ? "Step-up" : i >= 3 ? "Flagged" : "Verified";
         const status = i >= 5 ? "step" : i >= 3 ? "review" : "verified";
@@ -305,9 +327,9 @@ export default function VelocityShieldPage() {
         await new Promise((r) => setTimeout(r, 320));
       }
     } else if (type === "burst") {
-      // 10x high frequency surge
+      // 10x high frequency surges
       for (let i = 1; i <= 10; i++) {
-        spikeEnergyRef.current = 1.2;
+        spikeEnergyRef.current = 1.3;
         const action = i > 7 ? "OTP_CHALLENGE" : i > 4 ? "FLAG_REVIEW" : "ALLOW";
         const label = i > 7 ? "Step-up" : i > 4 ? "Flagged" : "Verified";
         const status = i > 7 ? "step" : i > 4 ? "review" : "verified";
@@ -323,6 +345,7 @@ export default function VelocityShieldPage() {
         await new Promise((r) => setTimeout(r, 180));
       }
     } else {
+      spikeEnergyRef.current = 0.3;
       const entry: TelemetryEntry = {
         id: randId(),
         tag: "regular checkout · ₹1,450.00",
@@ -349,9 +372,9 @@ export default function VelocityShieldPage() {
           <p>Zero-mutation edge defense against card-testing and velocity bursts.</p>
         </div>
 
-        {/* Waveform Panel with Real-Time RPS Counter */}
+        {/* Waveform Panel with Real-Time Continuous Streaming Wave */}
         <div className="wave-panel">
-          <canvas ref={canvasRef} className="wave-canvas" />
+          <canvas ref={canvasRef} className="wave-canvas" style={{ width: "100%", height: "200px" }} />
           <div className="wave-overlay">
             <span className="wave-tag">-60s horizon · {currentRPS} req/s</span>
             <span className="wave-tag">sub-2ms live edge</span>
