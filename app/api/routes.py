@@ -2,20 +2,48 @@ import os
 import glob
 import json
 import logging
+import random
+import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 from app.config import settings
 from app.db.client import get_supabase_client
 from app.engines.velocity.ratio_monitor import get_dispute_ratio_report
+from app.engines.velocity.shield import (
+    evaluate_transaction_velocity,
+    get_velocity_telemetry,
+    get_velocity_policy,
+    update_velocity_policy,
+)
 
 router = APIRouter()
 logger = logging.getLogger("razorsentinel.api")
 
-# Local fallback store for in-memory or local file sync when Supabase is offline
 LOCAL_DISPUTES: List[Dict[str, Any]] = []
 LOCAL_VELOCITY_LOGS: List[Dict[str, Any]] = []
+
+
+# Request / Response Schemas
+class PolicyUpdateRequest(BaseModel):
+    micro_threshold: Optional[float] = Field(None, description="Micro-probe sub-threshold cap in INR")
+    window_seconds: Optional[int] = Field(None, description="Sliding window horizon in seconds")
+
+
+class EvaluateTransactionRequest(BaseModel):
+    ip_address: str = "192.168.1.100"
+    bin_number: str = "411111"
+    amount_in_inr: float = 2.50
+    user_agent: str = "Mozilla/5.0"
+    is_simulated: bool = False
+
+
+class SimulateAttackRequest(BaseModel):
+    scenario: str = Field("sweep", description="sweep | burst | standard")
+    ip_address: Optional[str] = None
+    bin_number: Optional[str] = None
 
 
 @router.get("/system/status")
@@ -52,11 +80,9 @@ def get_disputes() -> List[Dict[str, Any]]:
         )
         return res.data or []
     except Exception as e:
-        logger.debug(f"Supabase unavailable for /api/disputes (using local sync fallback): {e}")
-        # Return local sync or scan generated dossiers
+        logger.debug(f"Supabase unavailable for /api/disputes (using local fallback): {e}")
         dossier_files = glob.glob("data/dossiers/*.pdf")
         if not LOCAL_DISPUTES and dossier_files:
-            # Reconstruct entries from generated dossiers
             synced = []
             for dpath in dossier_files:
                 disp_id = os.path.splitext(os.path.basename(dpath))[0]
@@ -80,29 +106,137 @@ def get_disputes() -> List[Dict[str, Any]]:
         return LOCAL_DISPUTES
 
 
-@router.get("/velocity/ratio")
-def get_velocity_ratio() -> Dict[str, Any]:
-    """Returns rolling dispute-to-turnover ratio report with regulatory status (safe/watch/danger)."""
+@router.get("/metrics/ratio")
+def get_metrics_ratio() -> Dict[str, Any]:
+    """Returns rolling dispute-to-turnover ratio report with regulatory status."""
     return get_dispute_ratio_report(days=30)
+
+
+@router.get("/velocity/telemetry")
+def get_telemetry() -> Dict[str, Any]:
+    """Returns genuine real-time sliding window telemetry (RPS, event counts, activity timeline)."""
+    return get_velocity_telemetry()
+
+
+@router.get("/velocity/policy")
+def get_policy() -> Dict[str, Any]:
+    """Returns active velocity protection thresholds."""
+    return get_velocity_policy()
+
+
+@router.post("/velocity/policy")
+def update_policy(req: PolicyUpdateRequest) -> Dict[str, Any]:
+    """Dynamically binds and updates velocity protection thresholds."""
+    return update_velocity_policy(
+        micro_threshold=req.micro_threshold,
+        window_seconds=req.window_seconds,
+    )
+
+
+@router.post("/velocity/evaluate")
+def evaluate_transaction(req: EvaluateTransactionRequest) -> Dict[str, Any]:
+    """Evaluates a single transaction against the sliding window."""
+    result = evaluate_transaction_velocity(
+        ip_address=req.ip_address,
+        bin_number=req.bin_number,
+        amount_in_inr=req.amount_in_inr,
+        user_agent=req.user_agent,
+        is_simulated=req.is_simulated,
+    )
+    return result
+
+
+@router.post("/velocity/simulate")
+def simulate_attack(req: SimulateAttackRequest) -> Dict[str, Any]:
+    """Dispatches a synthetic attack burst into the velocity engine and returns real evaluated verdicts."""
+    scenario = req.scenario.lower().strip()
+    sim_ip = req.ip_address or f"198.51.100.{random.randint(10, 99)}"
+    sim_bin = req.bin_number or "400012"
+    user_agent = "SyntheticAttackBot/2.0 (Testing)"
+
+    steps = []
+    if scenario == "sweep":
+        # 5x ₹2.50 micro-probes
+        for i in range(1, 6):
+            res = evaluate_transaction_velocity(
+                ip_address=sim_ip,
+                bin_number=sim_bin,
+                amount_in_inr=2.50,
+                user_agent=user_agent,
+                is_simulated=True,
+            )
+            steps.append({
+                "step": i,
+                "amount": 2.50,
+                "action": res["action"],
+                "eval_ms": res["eval_ms"],
+                "window_count": res["window_count"],
+                "log_entry": res["log_entry"],
+            })
+    elif scenario == "burst":
+        # 10x ₹850.00 velocity surges
+        for i in range(1, 11):
+            res = evaluate_transaction_velocity(
+                ip_address=sim_ip,
+                bin_number=sim_bin,
+                amount_in_inr=850.00,
+                user_agent=user_agent,
+                is_simulated=True,
+            )
+            steps.append({
+                "step": i,
+                "amount": 850.00,
+                "action": res["action"],
+                "eval_ms": res["eval_ms"],
+                "window_count": res["window_count"],
+                "log_entry": res["log_entry"],
+            })
+    else:
+        # 1x ₹1,450.00 standard order
+        res = evaluate_transaction_velocity(
+            ip_address=sim_ip,
+            bin_number=sim_bin,
+            amount_in_inr=1450.00,
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            is_simulated=True,
+        )
+        steps.append({
+            "step": 1,
+            "amount": 1450.00,
+            "action": res["action"],
+            "eval_ms": res["eval_ms"],
+            "window_count": res["window_count"],
+            "log_entry": res["log_entry"],
+        })
+
+    return {
+        "scenario": scenario,
+        "total_steps": len(steps),
+        "steps": steps,
+        "telemetry": get_velocity_telemetry(),
+    }
 
 
 @router.get("/velocity/logs")
 def get_velocity_logs() -> List[Dict[str, Any]]:
-    """Fetches recent risk velocity logs where action taken was not ALLOW."""
+    """Fetches recent risk velocity logs from database or active memory stream."""
     try:
         supabase = get_supabase_client()
         res = (
             supabase.table("risk_velocity_logs")
             .select("*")
-            .neq("risk_action_taken", "ALLOW")
             .order("created_at", desc=True)
             .limit(50)
             .execute()
         )
-        return res.data or []
+        if res.data and len(res.data) > 0:
+            return res.data
     except Exception as e:
-        logger.debug(f"Supabase unavailable for /api/velocity/logs (using local sync fallback): {e}")
-        return [log for log in LOCAL_VELOCITY_LOGS if log.get("risk_action_taken") != "ALLOW"]
+        logger.debug(f"Supabase unavailable for /api/velocity/logs: {e}")
+
+    # Fallback to in-memory rolling telemetry events
+    telemetry = get_velocity_telemetry()
+    return list(reversed(telemetry["recent_logs"]))
 
 
 @router.get("/dossiers/{dispute_id}")
