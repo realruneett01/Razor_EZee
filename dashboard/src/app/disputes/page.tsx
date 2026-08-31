@@ -17,7 +17,10 @@ import {
   Sparkles,
   ChevronRight,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  Upload,
+  X,
+  FileCode
 } from "lucide-react";
 import { DisputeItem } from "@/components/DisputeFeed";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -34,6 +37,16 @@ export default function DisputeStudioPage() {
   const [selectedDispute, setSelectedDispute] = useState<DisputeItem | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Live Multimodal Upload & OCR State
+  const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
+  const [uploadAwbFile, setUploadAwbFile] = useState<File | null>(null);
+  const [uploadPodFile, setUploadPodFile] = useState<File | null>(null);
+  const [uploadChatText, setUploadChatText] = useState<string>('Customer: "I got the shoe package yesterday, but the size is too tight. Can I exchange?"\nSupport: "Sure, we can help with a replacement."');
+  const [uploadDisputeId, setUploadDisputeId] = useState<string>("disp_custom_ocr_009");
+  const [uploadAmount, setUploadAmount] = useState<number>(499900);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [ocrResult, setOcrResult] = useState<any | null>(null);
 
   const fetchDisputes = useCallback(async () => {
     try {
@@ -102,12 +115,46 @@ export default function DisputeStudioPage() {
     }
   };
 
+  const handleRunOcrExtraction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploading(true);
+    setOcrResult(null);
+
+    const formData = new FormData();
+    if (uploadAwbFile) formData.append("awb_file", uploadAwbFile);
+    if (uploadPodFile) formData.append("pod_file", uploadPodFile);
+    formData.append("chat_text", uploadChatText);
+    formData.append("dispute_id", uploadDisputeId);
+    formData.append("amount", String(uploadAmount));
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/evidence/analyze`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        setOcrResult(json);
+        setActionSuccess(`✓ Multimodal OCR Analysis Complete: Score ${json.extraction.completeness_score.toFixed(2)}/1.00`);
+        fetchDisputes();
+        if (json.record) {
+          setSelectedDispute(json.record);
+        }
+      }
+    } catch (err) {
+      console.error("Upload failed", err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar onRefresh={fetchDisputes} isRefreshing={loading} />
 
       <main className="flex-1">
-        {/* Page Head */}
+        {/* Page Head with Upload Modal Trigger */}
         <div className="pagehead flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="eyebrow">Multimodal Gemini 3 Flash Extraction · Representment Engine</div>
@@ -115,6 +162,14 @@ export default function DisputeStudioPage() {
             <p>Inspect AI-extracted courier proof, customer admissions, and 1-page PDF dossiers.</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="btn btn-primary !py-1.5 !px-3.5 text-xs font-mono flex items-center gap-1.5 shadow-sm"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload Proof & Run OCR</span>
+            </button>
+
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono border ${
               merchantMode === "custom"
                 ? "bg-[var(--sage-soft)] text-[var(--sage)] border-[var(--sage)]/25"
@@ -132,6 +187,128 @@ export default function DisputeStudioPage() {
               <span>{actionSuccess}</span>
             </div>
             <button onClick={() => setActionSuccess(null)} className="text-[10px] opacity-75 hover:opacity-100">Dismiss</button>
+          </div>
+        )}
+
+        {/* Live Upload & OCR Extraction Modal */}
+        {showUploadModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+            <div className="bg-white border border-[var(--border-strong)] rounded-2xl max-w-xl w-full p-5 space-y-4 shadow-2xl text-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[var(--gold)]" />
+                  <h3 className="font-semibold text-sm text-[var(--text)]">Multimodal Evidence Ingestion & Live OCR</h3>
+                </div>
+                <button onClick={() => setShowUploadModal(false)} className="text-[var(--text-secondary)] hover:text-[var(--text)]">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleRunOcrExtraction} className="space-y-3.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-mono font-medium text-[var(--text-secondary)] mb-1">
+                      1. Courier AWB Slip (JPEG/PNG/PDF):
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => setUploadAwbFile(e.target.files?.[0] || null)}
+                      className="w-full text-[11px] font-mono file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-mono file:bg-[var(--gold-soft)] file:text-[var(--gold)] hover:file:bg-[var(--gold)]/20 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono font-medium text-[var(--text-secondary)] mb-1">
+                      2. POD Signature Pad Slip:
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => setUploadPodFile(e.target.files?.[0] || null)}
+                      className="w-full text-[11px] font-mono file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-mono file:bg-[var(--gold-soft)] file:text-[var(--gold)] hover:file:bg-[var(--gold)]/20 cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono font-medium text-[var(--text-secondary)] mb-1">
+                    3. Customer Chat Support Transcript (WhatsApp/Zendesk):
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={uploadChatText}
+                    onChange={(e) => setUploadChatText(e.target.value)}
+                    className="w-full bg-[var(--surface-warm)] border border-[var(--border-strong)] rounded-lg p-2 text-[11px] font-mono focus:outline-none focus:border-[var(--gold)] text-[var(--text)]"
+                    placeholder="Paste chat transcript with customer delivery admission..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-mono font-medium text-[var(--text-secondary)] mb-1">
+                      Dispute ID Ref:
+                    </label>
+                    <input
+                      type="text"
+                      value={uploadDisputeId}
+                      onChange={(e) => setUploadDisputeId(e.target.value)}
+                      className="w-full bg-[var(--surface-warm)] border border-[var(--border-strong)] rounded-lg px-2.5 py-1 text-[11px] font-mono focus:outline-none focus:border-[var(--gold)] text-[var(--text)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono font-medium text-[var(--text-secondary)] mb-1">
+                      Dispute Amount (INR):
+                    </label>
+                    <input
+                      type="number"
+                      value={uploadAmount / 100}
+                      onChange={(e) => setUploadAmount(Number(e.target.value) * 100)}
+                      className="w-full bg-[var(--surface-warm)] border border-[var(--border-strong)] rounded-lg px-2.5 py-1 text-[11px] font-mono focus:outline-none focus:border-[var(--gold)] text-[var(--text)]"
+                    />
+                  </div>
+                </div>
+
+                {ocrResult && (
+                  <div className="p-3 bg-[var(--surface-warm)] border border-[var(--sage)]/30 rounded-xl space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center justify-between text-[var(--sage)] font-semibold">
+                      <span>✓ Gate Score: {ocrResult.extraction.completeness_score.toFixed(2)} / 1.00</span>
+                      <span>Decision: {ocrResult.extraction.completeness_score >= 0.80 ? "AUTO-SUBMIT" : "DRAFT REVIEW"}</span>
+                    </div>
+                    <div className="text-[var(--text-secondary)] text-[10.5px]">
+                      AWB: <strong>{ocrResult.extraction.awb_number || "Extracted"}</strong> · POD Matched: <strong>{ocrResult.extraction.pod_signature_verified ? "YES" : "NO"}</strong>
+                    </div>
+                    <a
+                      href={`${API_BASE_URL}/dossiers/${uploadDisputeId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[var(--gold)] hover:underline pt-1 text-[11px]"
+                    >
+                      <Download className="w-3 h-3" /> View Generated 1-Page PDF Dossier
+                    </a>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadModal(false)}
+                    className="btn btn-ghost !py-1 !px-3 text-xs font-mono"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={uploading}
+                    className="btn btn-primary !py-1 !px-4 text-xs font-mono flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{uploading ? "Extracting via Gemini 3 Flash…" : "Run Multimodal OCR & Compile PDF"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
@@ -305,7 +482,7 @@ export default function DisputeStudioPage() {
                       <span className="text-[11px] font-mono text-[var(--sage)] font-medium">✓ Verified Delivered</span>
                     </div>
                     <div className="text-[11.5px] text-[var(--text-secondary)] font-mono space-y-0.5">
-                      <div>Carrier: <strong>BlueDart Express</strong> · Tracking AWB: <strong>#3849201948</strong></div>
+                      <div>Carrier: <strong>BlueDart Express</strong> · Tracking AWB: <strong>#{selectedDispute.evidence_doc_id || "3849201948"}</strong></div>
                       <div>Timestamp: <strong>2026-08-28 14:22:10 IST</strong> · Geo-Pin: <strong>19.0760° N, 72.8777° E</strong></div>
                     </div>
                   </div>

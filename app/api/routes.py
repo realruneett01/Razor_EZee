@@ -7,7 +7,7 @@ import time
 from typing import List, Dict, Any, Optional, cast
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, status, Header, Query
+from fastapi import APIRouter, HTTPException, status, Header, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from app.config import settings
 from app.db.client import get_supabase_client
@@ -18,6 +18,8 @@ from app.engines.velocity.shield import (
     get_velocity_policy,
     update_velocity_policy,
 )
+from app.engines.evidence.extract import analyze_dispute_evidence
+from app.engines.evidence.dossier import generate_dossier_pdf
 
 router = APIRouter()
 logger = logging.getLogger("razorsentinel.api")
@@ -130,6 +132,70 @@ def contest_dispute(dispute_id: str, req: Optional[Dict[str, Any]] = None) -> Di
         "dispute_id": dispute_id,
         "action": "submit",
         "message": f"Dispute {dispute_id} approved and submitted to Razorpay API with action='submit'",
+    }
+
+
+# =========================================================================
+# Live Multimodal File Upload & OCR Extraction API
+# =========================================================================
+
+@router.post("/evidence/analyze")
+async def analyze_uploaded_evidence(
+    awb_file: Optional[UploadFile] = File(None),
+    pod_file: Optional[UploadFile] = File(None),
+    chat_text: Optional[str] = Form(None),
+    dispute_id: Optional[str] = Form(None),
+    reason_code: Optional[str] = Form("goods_not_received"),
+    amount: Optional[int] = Form(499900),
+) -> Dict[str, Any]:
+    """Accepts live uploaded AWB slip, POD signature, and chat transcript, runs multimodal OCR via Gemini 3 Flash,
+    computes the Honesty Gate score, and compiles the court/bank-ready 1-page PDF dossier."""
+    disp_id = dispute_id or f"disp_upload_{int(time.time())}"
+
+    awb_bytes = await awb_file.read() if awb_file else None
+    pod_bytes = await pod_file.read() if pod_file else None
+
+    # Run Multimodal OCR / Gemini 3 Flash extraction
+    extraction = analyze_dispute_evidence(
+        awb_image_bytes=awb_bytes,
+        pod_image_bytes=pod_bytes,
+        chat_log_text=chat_text or "",
+    )
+
+    # Generate 1-Page PDF Dossier
+    pdf_path = generate_dossier_pdf(extraction=extraction, dispute_id=disp_id)
+
+    # Ingest into active dispute pool
+    new_record: Dict[str, Any] = {
+        "id": disp_id,
+        "merchant_id": DEMO_MERCHANT_ID,
+        "payment_id": f"pay_{disp_id}",
+        "order_id": f"order_{disp_id}",
+        "amount_disputed": amount,
+        "reason_code": reason_code,
+        "status": "under_review" if extraction.completeness_score >= 0.80 else "draft",
+        "completeness_score": extraction.completeness_score,
+        "contradiction_found": extraction.customer_chat_admission,
+        "auto_submitted": extraction.completeness_score >= 0.80,
+        "evidence_doc_id": extraction.awb_number or "custom_uploaded_awb",
+        "dossier_pdf_url": f"/api/dossiers/{disp_id}",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    LOCAL_DISPUTES.insert(0, new_record)
+
+    try:
+        supabase = get_supabase_client()
+        supabase.table("disputes").insert(new_record).execute()
+    except Exception as e:
+        logger.debug(f"Supabase dispute insert skipped for upload: {e}")
+
+    return {
+        "status": "success",
+        "dispute_id": disp_id,
+        "extraction": extraction.model_dump(),
+        "pdf_url": f"/api/dossiers/{disp_id}",
+        "record": new_record,
     }
 
 
