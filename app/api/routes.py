@@ -4,7 +4,7 @@ import json
 import logging
 import random
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, cast
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, status, Header, Query
@@ -89,8 +89,8 @@ def get_disputes(
             query = query.eq("merchant_id", effective_merchant_id)
 
         res = query.order("created_at", desc=True).limit(50).execute()
-        if res.data and len(res.data) > 0:
-            return res.data
+        if res.data and isinstance(res.data, list) and len(res.data) > 0:
+            return [cast(Dict[str, Any], d) for d in res.data if isinstance(d, dict)]
     except Exception as e:
         logger.debug(f"Supabase unavailable for /api/disputes (using local fallback): {e}")
 
@@ -106,7 +106,7 @@ def get_disputes(
 
 
 @router.post("/disputes/{dispute_id}/contest")
-def contest_dispute(dispute_id: str, req: Dict[str, Any] = None) -> Dict[str, Any]:
+def contest_dispute(dispute_id: str, req: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Approves and submits a contested dispute to Razorpay API (action='submit')."""
     try:
         supabase = get_supabase_client()
@@ -148,18 +148,13 @@ def get_analytics_summary(
     merchant_id: Optional[str] = Query(None, description="Optional merchant ID filter"),
     x_merchant_id: Optional[str] = Header(None, alias="X-Merchant-Id"),
 ) -> Dict[str, Any]:
-    """Computes immutable, mathematically verified risk analytics scoped to authenticated merchant_id.
-
-    Aggregations:
-      A. Net Capital Recovered: SUM(amount_disputed)/100 WHERE status = 'won'
-      B. Arbitration Penalties Avoided: COUNT(disputes with score < 0.80 or auto_submitted=False) * 2,500
-      C. Settlement Risk Ratio: (Total 30d Disputes Paise / Total 30d Orders Paise) * 100
-      D. Velocity Shield Blocks: COUNT(risk_velocity_logs with action != 'ALLOW' in last 30d)
-      E. Carrier Proof Win Rates: Won / Total per logistics partner
-      F. Dispute Reason Breakdown: Normalized proportional distribution
-    """
+    """Computes immutable, mathematically verified risk analytics scoped to authenticated merchant_id."""
     effective_merchant_id = merchant_id or x_merchant_id or DEMO_MERCHANT_ID
     cutoff_30d = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+
+    disputes: List[Dict[str, Any]] = []
+    orders: List[Dict[str, Any]] = []
+    velocity_logs: List[Dict[str, Any]] = []
 
     try:
         supabase = get_supabase_client()
@@ -169,7 +164,8 @@ def get_analytics_summary(
         if effective_merchant_id:
             disp_query = disp_query.eq("merchant_id", effective_merchant_id)
         disputes_res = disp_query.execute()
-        disputes = disputes_res.data or []
+        raw_disputes = disputes_res.data or []
+        disputes = [cast(Dict[str, Any], d) for d in raw_disputes if isinstance(d, dict)]
 
         # 2. Scoped Orders Query
         orders_query = (
@@ -180,7 +176,8 @@ def get_analytics_summary(
         if effective_merchant_id:
             orders_query = orders_query.eq("merchant_id", effective_merchant_id)
         orders_res = orders_query.execute()
-        orders = orders_res.data or []
+        raw_orders = orders_res.data or []
+        orders = [cast(Dict[str, Any], o) for o in raw_orders if isinstance(o, dict)]
 
         # 3. Scoped Velocity Logs Query
         velocity_query = (
@@ -191,7 +188,8 @@ def get_analytics_summary(
         if effective_merchant_id:
             velocity_query = velocity_query.eq("merchant_id", effective_merchant_id)
         velocity_res = velocity_query.execute()
-        velocity_logs = velocity_res.data or []
+        raw_velocity = velocity_res.data or []
+        velocity_logs = [cast(Dict[str, Any], v) for v in raw_velocity if isinstance(v, dict)]
 
     except Exception as e:
         logger.debug(f"Supabase unavailable for /api/analytics/summary (using memory sync): {e}")
@@ -201,26 +199,29 @@ def get_analytics_summary(
 
     # --- Metric A: Net Capital Recovered ---
     won_disputes = [d for d in disputes if d.get("status") == "won"]
-    capital_recovered_paise = sum(d.get("amount_disputed", 0) for d in won_disputes)
+    capital_recovered_paise = sum(int(d.get("amount_disputed") or 0) for d in won_disputes)
     if capital_recovered_paise == 0:
-        defended_disputes = [d for d in disputes if d.get("auto_submitted") or (d.get("completeness_score", 0) >= 0.80)]
-        capital_recovered_paise = sum(d.get("amount_disputed", 0) for d in defended_disputes)
+        defended_disputes = [
+            d for d in disputes 
+            if bool(d.get("auto_submitted")) or (float(d.get("completeness_score") or 0) >= 0.80)
+        ]
+        capital_recovered_paise = sum(int(d.get("amount_disputed") or 0) for d in defended_disputes)
     capital_recovered_inr = capital_recovered_paise / 100.0
 
     # --- Metric B: Arbitration Penalties Avoided ---
     draft_disputes = [
         d for d in disputes 
-        if (d.get("completeness_score", 0) < 0.80) or not d.get("auto_submitted", False)
+        if (float(d.get("completeness_score") or 0) < 0.80) or not bool(d.get("auto_submitted"))
     ]
     penalties_avoided_count = len(draft_disputes) if draft_disputes else 10
     penalties_avoided_inr = penalties_avoided_count * 2500
 
     # --- Metric C: Acquiring Bank Settlement Risk Ratio ---
     ratio_report = get_dispute_ratio_report(days=30, merchant_id=effective_merchant_id)
-    dispute_ratio_pct = ratio_report["dispute_ratio_percentage"]
+    dispute_ratio_pct = float(ratio_report["dispute_ratio_percentage"])
     if dispute_ratio_pct == 0.0 and len(disputes) > 0:
         dispute_ratio_pct = 0.25
-    ratio_status = ratio_report["status"]
+    ratio_status = str(ratio_report["status"])
 
     trajectory = {
         "safe_pct": 46.0,
@@ -231,36 +232,39 @@ def get_analytics_summary(
     # --- Metric D: Velocity Shield Blocks ---
     blocked_events = [
         v for v in velocity_logs 
-        if v.get("risk_action_taken") in ["CHALLENGE_STEP_UP_OTP", "FLAG_FOR_REVIEW", "BLOCK"]
+        if str(v.get("risk_action_taken")) in ["CHALLENGE_STEP_UP_OTP", "FLAG_FOR_REVIEW", "BLOCK"]
     ]
     velocity_blocks_count = len(blocked_events) if len(blocked_events) > 0 else 1247
 
     # --- Metric E: Logistics Carrier Win-Rate Index ---
-    carrier_stats = {
+    carrier_stats: Dict[str, Dict[str, Any]] = {
         "bluedart": {"name": "BlueDart Express", "won": 0, "total": 0, "default_win_rate": 92.8, "notes": "High-resolution digital signature pads give strong POD verification."},
         "delhivery": {"name": "Delhivery Logistics", "won": 0, "total": 0, "default_win_rate": 90.9, "notes": "Automated OTP delivery confirmation offers unassailable courier proof."},
         "shadowfax": {"name": "Shadowfax", "won": 0, "total": 0, "default_win_rate": 83.3, "notes": "Hyperlocal geo-coordinates provide strong non-repudiation backing."},
     }
 
     for d in disputes:
-        carrier_key = "bluedart" if "bluedart" in str(d.get("evidence_doc_id", "")).lower() else "delhivery" if "delhivery" in str(d.get("evidence_doc_id", "")).lower() else "shadowfax" if "shadowfax" in str(d.get("evidence_doc_id", "")).lower() else "bluedart"
-        carrier_stats[carrier_key]["total"] += 1
-        if d.get("status") == "won" or d.get("auto_submitted"):
-            carrier_stats[carrier_key]["won"] += 1
+        evidence_doc = str(d.get("evidence_doc_id") or "").lower()
+        carrier_key = "bluedart" if "bluedart" in evidence_doc else "delhivery" if "delhivery" in evidence_doc else "shadowfax" if "shadowfax" in evidence_doc else "bluedart"
+        carrier_stats[carrier_key]["total"] = int(carrier_stats[carrier_key]["total"]) + 1
+        if d.get("status") == "won" or bool(d.get("auto_submitted")):
+            carrier_stats[carrier_key]["won"] = int(carrier_stats[carrier_key]["won"]) + 1
 
     carrier_win_rates = []
     for k, v in carrier_stats.items():
-        rate = round((v["won"] / v["total"]) * 100.0, 1) if v["total"] > 0 else v["default_win_rate"]
+        total_cnt = int(v["total"])
+        won_cnt = int(v["won"])
+        rate = round((won_cnt / total_cnt) * 100.0, 1) if total_cnt > 0 else float(v["default_win_rate"])
         carrier_win_rates.append({
             "id": k,
-            "carrier_name": v["name"],
+            "carrier_name": str(v["name"]),
             "win_rate_pct": rate,
-            "total_disputes": v["total"],
-            "notes": v["notes"],
+            "total_disputes": total_cnt,
+            "notes": str(v["notes"]),
         })
 
     # --- Metric F: Dispute Reason Breakdown ---
-    reason_palette = {
+    reason_palette: Dict[str, Dict[str, Any]] = {
         "goods_not_received": {"label": "Goods not received", "color": "var(--gold)", "default_pct": 57.1},
         "unauthorized_transaction": {"label": "Unauthorized transaction", "color": "var(--taupe)", "default_pct": 28.6},
         "duplicate_charge": {"label": "Duplicate charge", "color": "var(--amber)", "default_pct": 14.3},
@@ -269,7 +273,7 @@ def get_analytics_summary(
 
     reason_counts: Dict[str, int] = {}
     for d in disputes:
-        rc = d.get("reason_code") or "goods_not_received"
+        rc = str(d.get("reason_code") or "goods_not_received")
         norm_rc = rc.lower().strip().replace("-", "_")
         reason_counts[norm_rc] = reason_counts.get(norm_rc, 0) + 1
 
@@ -281,19 +285,19 @@ def get_analytics_summary(
             pct = round((cnt / total_disputes_count) * 100.0, 1)
             reason_breakdown.append({
                 "code": code,
-                "label": meta["label"],
+                "label": str(meta["label"]),
                 "count": cnt,
                 "pct": pct,
-                "color": meta["color"],
+                "color": str(meta["color"]),
             })
     else:
         for code, meta in reason_palette.items():
             reason_breakdown.append({
                 "code": code,
-                "label": meta["label"],
+                "label": str(meta["label"]),
                 "count": 0,
-                "pct": meta["default_pct"],
-                "color": meta["color"],
+                "pct": float(meta["default_pct"]),
+                "color": str(meta["color"]),
             })
 
     return {
@@ -480,8 +484,8 @@ def get_velocity_logs() -> List[Dict[str, Any]]:
             .limit(50)
             .execute()
         )
-        if res.data and len(res.data) > 0:
-            return res.data
+        if res.data and isinstance(res.data, list) and len(res.data) > 0:
+            return [cast(Dict[str, Any], v) for v in res.data if isinstance(v, dict)]
     except Exception as e:
         logger.debug(f"Supabase unavailable for /api/velocity/logs: {e}")
 

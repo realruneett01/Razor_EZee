@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from app.db.client import get_supabase_client
 
 logger = logging.getLogger("razorsentinel.velocity.ratio")
@@ -33,8 +33,8 @@ def get_ratio_status(ratio: float) -> str:
 def compute_dispute_ratio(
     days: int = 30,
     merchant_id: Optional[str] = None,
-    disputes_override: Optional[list] = None,
-    orders_override: Optional[list] = None,
+    disputes_override: Optional[List[Dict[str, Any]]] = None,
+    orders_override: Optional[List[Dict[str, Any]]] = None,
 ) -> float:
     """Computes the rolling dispute-to-turnover ratio percentage over the specified window (default 30 days)
     filtered by merchant_id if specified.
@@ -45,12 +45,16 @@ def compute_dispute_ratio(
     Returns:
         float: Dispute ratio percentage rounded to 4 decimal places (e.g. 0.35 for 0.35%).
     """
-    total_disputed_paise = 0
-    total_order_paise = 0
+    total_disputed_paise: int = 0
+    total_order_paise: int = 0
 
     if disputes_override is not None and orders_override is not None:
-        total_disputed_paise = sum(d.get("amount_disputed", 0) for d in disputes_override)
-        total_order_paise = sum(o.get("amount", 0) for o in orders_override)
+        for d in disputes_override:
+            if isinstance(d, dict):
+                total_disputed_paise += int(d.get("amount_disputed") or 0)
+        for o in orders_override:
+            if isinstance(o, dict):
+                total_order_paise += int(o.get("amount") or 0)
     else:
         try:
             supabase = get_supabase_client()
@@ -66,7 +70,10 @@ def compute_dispute_ratio(
                 disp_query = disp_query.eq("merchant_id", merchant_id)
 
             disputes_res = disp_query.execute()
-            total_disputed_paise = sum(row.get("amount_disputed", 0) for row in disputes_res.data or [])
+            raw_disputes = disputes_res.data or []
+            for row in raw_disputes:
+                if isinstance(row, dict):
+                    total_disputed_paise += int(row.get("amount_disputed") or 0)
 
             # Query successful orders in rolling window
             orders_query = (
@@ -78,7 +85,10 @@ def compute_dispute_ratio(
                 orders_query = orders_query.eq("merchant_id", merchant_id)
 
             orders_res = orders_query.execute()
-            total_order_paise = sum(row.get("amount", 0) for row in orders_res.data or [])
+            raw_orders = orders_res.data or []
+            for row in raw_orders:
+                if isinstance(row, dict):
+                    total_order_paise += int(row.get("amount") or 0)
 
         except Exception as e:
             logger.debug(f"Supabase unavailable for ratio computation (returning 0.0 in offline mode): {e}")
@@ -87,7 +97,7 @@ def compute_dispute_ratio(
     if total_order_paise <= 0:
         return 0.0
 
-    ratio = (total_disputed_paise / total_order_paise) * 100.0
+    ratio = (float(total_disputed_paise) / float(total_order_paise)) * 100.0
     return round(ratio, 4)
 
 
