@@ -10,6 +10,20 @@ THRESHOLD_SAFE_MAX = 0.30   # < 0.30%
 THRESHOLD_WATCH_MAX = 0.45  # 0.30% to 0.45% (Pre-threshold alert)
 
 
+def _safe_int(val: Any) -> int:
+    """Safely converts arbitrary JSON value to integer paise."""
+    if val is None:
+        return 0
+    if isinstance(val, (int, float)):
+        return int(val)
+    if isinstance(val, str):
+        try:
+            return int(float(val))
+        except (ValueError, TypeError):
+            return 0
+    return 0
+
+
 def get_ratio_status(ratio: float) -> str:
     """Returns the regulatory risk status for a given dispute-to-turnover ratio.
 
@@ -51,10 +65,10 @@ def compute_dispute_ratio(
     if disputes_override is not None and orders_override is not None:
         for d in disputes_override:
             if isinstance(d, dict):
-                total_disputed_paise += int(d.get("amount_disputed") or 0)
+                total_disputed_paise += _safe_int(d.get("amount_disputed"))
         for o in orders_override:
             if isinstance(o, dict):
-                total_order_paise += int(o.get("amount") or 0)
+                total_order_paise += _safe_int(o.get("amount"))
     else:
         try:
             supabase = get_supabase_client()
@@ -73,7 +87,7 @@ def compute_dispute_ratio(
             raw_disputes = disputes_res.data or []
             for row in raw_disputes:
                 if isinstance(row, dict):
-                    total_disputed_paise += int(row.get("amount_disputed") or 0)
+                    total_disputed_paise += _safe_int(row.get("amount_disputed"))
 
             # Query successful orders in rolling window
             orders_query = (
@@ -88,7 +102,7 @@ def compute_dispute_ratio(
             raw_orders = orders_res.data or []
             for row in raw_orders:
                 if isinstance(row, dict):
-                    total_order_paise += int(row.get("amount") or 0)
+                    total_order_paise += _safe_int(row.get("amount"))
 
         except Exception as e:
             logger.debug(f"Supabase unavailable for ratio computation (returning 0.0 in offline mode): {e}")
