@@ -32,10 +32,12 @@ def get_ratio_status(ratio: float) -> str:
 
 def compute_dispute_ratio(
     days: int = 30,
+    merchant_id: Optional[str] = None,
     disputes_override: Optional[list] = None,
     orders_override: Optional[list] = None,
 ) -> float:
-    """Computes the rolling dispute-to-turnover ratio percentage over the specified window (default 30 days).
+    """Computes the rolling dispute-to-turnover ratio percentage over the specified window (default 30 days)
+    filtered by merchant_id if specified.
 
     Formula:
         Ratio (%) = (Total Disputed Amount in Paise / Total Successful Orders Amount in Paise) * 100
@@ -55,21 +57,27 @@ def compute_dispute_ratio(
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
             # Query disputes in rolling window
-            disputes_res = (
+            disp_query = (
                 supabase.table("disputes")
                 .select("amount_disputed")
                 .gte("created_at", cutoff)
-                .execute()
             )
+            if merchant_id:
+                disp_query = disp_query.eq("merchant_id", merchant_id)
+
+            disputes_res = disp_query.execute()
             total_disputed_paise = sum(row.get("amount_disputed", 0) for row in disputes_res.data or [])
 
             # Query successful orders in rolling window
-            orders_res = (
+            orders_query = (
                 supabase.table("successful_orders")
                 .select("amount")
                 .gte("created_at", cutoff)
-                .execute()
             )
+            if merchant_id:
+                orders_query = orders_query.eq("merchant_id", merchant_id)
+
+            orders_res = orders_query.execute()
             total_order_paise = sum(row.get("amount", 0) for row in orders_res.data or [])
 
         except Exception as e:
@@ -83,13 +91,14 @@ def compute_dispute_ratio(
     return round(ratio, 4)
 
 
-def get_dispute_ratio_report(days: int = 30) -> Dict[str, Any]:
+def get_dispute_ratio_report(days: int = 30, merchant_id: Optional[str] = None) -> Dict[str, Any]:
     """Generates a complete dispute ratio health report for the dashboard and monitoring."""
-    ratio = compute_dispute_ratio(days=days)
+    ratio = compute_dispute_ratio(days=days, merchant_id=merchant_id)
     status = get_ratio_status(ratio)
 
     return {
         "rolling_days": days,
+        "merchant_id": merchant_id,
         "dispute_ratio_percentage": ratio,
         "status": status,
         "threshold_safe": THRESHOLD_SAFE_MAX,

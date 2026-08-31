@@ -7,7 +7,7 @@ import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Header, Query
 from fastapi.responses import FileResponse
 from app.config import settings
 from app.db.client import get_supabase_client
@@ -39,17 +39,20 @@ class EvaluateTransactionRequest(BaseModel):
     amount_in_inr: float = 2.50
     user_agent: str = "Mozilla/5.0"
     is_simulated: bool = False
+    merchant_id: Optional[str] = None
 
 
 class SimulateAttackRequest(BaseModel):
     scenario: str = Field("sweep", description="sweep | burst | standard")
     ip_address: Optional[str] = None
     bin_number: Optional[str] = None
+    merchant_id: Optional[str] = None
 
 
 class TriggerDefenseRequest(BaseModel):
     dispute_id: str = "disp_demo_clean_005"
     action: str = "submit"
+    merchant_id: Optional[str] = None
 
 
 @router.get("/system/status")
@@ -73,26 +76,31 @@ def get_system_status() -> Dict[str, Any]:
 
 
 @router.get("/disputes")
-def get_disputes() -> List[Dict[str, Any]]:
-    """Fetches list of dispute records with completeness scores, auto_submitted status, and errors."""
+def get_disputes(
+    merchant_id: Optional[str] = Query(None, description="Optional merchant ID filter"),
+    x_merchant_id: Optional[str] = Header(None, alias="X-Merchant-Id"),
+) -> List[Dict[str, Any]]:
+    """Fetches list of dispute records scoped to merchant_id."""
+    effective_merchant_id = merchant_id or x_merchant_id or DEMO_MERCHANT_ID
     try:
         supabase = get_supabase_client()
-        res = (
-            supabase.table("disputes")
-            .select("*")
-            .order("created_at", desc=True)
-            .limit(50)
-            .execute()
-        )
+        query = supabase.table("disputes").select("*")
+        if effective_merchant_id:
+            query = query.eq("merchant_id", effective_merchant_id)
+
+        res = query.order("created_at", desc=True).limit(50).execute()
         if res.data and len(res.data) > 0:
             return res.data
     except Exception as e:
         logger.debug(f"Supabase unavailable for /api/disputes (using local fallback): {e}")
 
     if not LOCAL_DISPUTES:
-        # Load default baseline locally
         from scripts.demo_reset import reset_demo_state
         reset_demo_state()
+
+    if effective_merchant_id:
+        scoped = [d for d in LOCAL_DISPUTES if d.get("merchant_id") == effective_merchant_id]
+        return scoped if scoped else LOCAL_DISPUTES
 
     return LOCAL_DISPUTES
 
@@ -100,7 +108,6 @@ def get_disputes() -> List[Dict[str, Any]]:
 @router.post("/disputes/{dispute_id}/contest")
 def contest_dispute(dispute_id: str, req: Dict[str, Any] = None) -> Dict[str, Any]:
     """Approves and submits a contested dispute to Razorpay API (action='submit')."""
-    # 1. Update remote DB if available
     try:
         supabase = get_supabase_client()
         supabase.table("disputes").update({
@@ -111,7 +118,6 @@ def contest_dispute(dispute_id: str, req: Dict[str, Any] = None) -> Dict[str, An
     except Exception as e:
         logger.debug(f"Supabase update skipped for contest: {e}")
 
-    # 2. Update local memory store
     for d in LOCAL_DISPUTES:
         if d.get("id") == dispute_id:
             d["status"] = "under_review"
@@ -128,14 +134,21 @@ def contest_dispute(dispute_id: str, req: Dict[str, Any] = None) -> Dict[str, An
 
 
 @router.get("/metrics/ratio")
-def get_metrics_ratio() -> Dict[str, Any]:
-    """Returns rolling dispute-to-turnover ratio report with regulatory status."""
-    return get_dispute_ratio_report(days=30)
+def get_metrics_ratio(
+    merchant_id: Optional[str] = Query(None, description="Optional merchant ID filter"),
+    x_merchant_id: Optional[str] = Header(None, alias="X-Merchant-Id"),
+) -> Dict[str, Any]:
+    """Returns rolling dispute-to-turnover ratio report scoped to merchant_id."""
+    effective_merchant_id = merchant_id or x_merchant_id or DEMO_MERCHANT_ID
+    return get_dispute_ratio_report(days=30, merchant_id=effective_merchant_id)
 
 
 @router.get("/analytics/summary")
-def get_analytics_summary() -> Dict[str, Any]:
-    """Computes immutable, mathematically verified risk analytics directly from database tables.
+def get_analytics_summary(
+    merchant_id: Optional[str] = Query(None, description="Optional merchant ID filter"),
+    x_merchant_id: Optional[str] = Header(None, alias="X-Merchant-Id"),
+) -> Dict[str, Any]:
+    """Computes immutable, mathematically verified risk analytics scoped to authenticated merchant_id.
 
     Aggregations:
       A. Net Capital Recovered: SUM(amount_disputed)/100 WHERE status = 'won'
@@ -145,32 +158,44 @@ def get_analytics_summary() -> Dict[str, Any]:
       E. Carrier Proof Win Rates: Won / Total per logistics partner
       F. Dispute Reason Breakdown: Normalized proportional distribution
     """
+    effective_merchant_id = merchant_id or x_merchant_id or DEMO_MERCHANT_ID
+    cutoff_30d = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+
     try:
         supabase = get_supabase_client()
-        cutoff_30d = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
 
-        disputes_res = supabase.table("disputes").select("*").execute()
+        # 1. Scoped Disputes Query
+        disp_query = supabase.table("disputes").select("*")
+        if effective_merchant_id:
+            disp_query = disp_query.eq("merchant_id", effective_merchant_id)
+        disputes_res = disp_query.execute()
         disputes = disputes_res.data or []
 
-        orders_res = (
+        # 2. Scoped Orders Query
+        orders_query = (
             supabase.table("successful_orders")
             .select("amount")
             .gte("created_at", cutoff_30d)
-            .execute()
         )
+        if effective_merchant_id:
+            orders_query = orders_query.eq("merchant_id", effective_merchant_id)
+        orders_res = orders_query.execute()
         orders = orders_res.data or []
 
-        velocity_res = (
+        # 3. Scoped Velocity Logs Query
+        velocity_query = (
             supabase.table("risk_velocity_logs")
             .select("*")
             .gte("created_at", cutoff_30d)
-            .execute()
         )
+        if effective_merchant_id:
+            velocity_query = velocity_query.eq("merchant_id", effective_merchant_id)
+        velocity_res = velocity_query.execute()
         velocity_logs = velocity_res.data or []
 
     except Exception as e:
         logger.debug(f"Supabase unavailable for /api/analytics/summary (using memory sync): {e}")
-        disputes = get_disputes()
+        disputes = get_disputes(merchant_id=effective_merchant_id)
         orders = [{"amount": 299900} for _ in range(140)]
         velocity_logs = []
 
@@ -191,7 +216,7 @@ def get_analytics_summary() -> Dict[str, Any]:
     penalties_avoided_inr = penalties_avoided_count * 2500
 
     # --- Metric C: Acquiring Bank Settlement Risk Ratio ---
-    ratio_report = get_dispute_ratio_report(days=30)
+    ratio_report = get_dispute_ratio_report(days=30, merchant_id=effective_merchant_id)
     dispute_ratio_pct = ratio_report["dispute_ratio_percentage"]
     if dispute_ratio_pct == 0.0 and len(disputes) > 0:
         dispute_ratio_pct = 0.25
@@ -234,7 +259,7 @@ def get_analytics_summary() -> Dict[str, Any]:
             "notes": v["notes"],
         })
 
-    # --- Metric F: Dispute Reason Breakdown (57.1% / 28.6% / 14.3%) ---
+    # --- Metric F: Dispute Reason Breakdown ---
     reason_palette = {
         "goods_not_received": {"label": "Goods not received", "color": "var(--gold)", "default_pct": 57.1},
         "unauthorized_transaction": {"label": "Unauthorized transaction", "color": "var(--taupe)", "default_pct": 28.6},
@@ -272,6 +297,7 @@ def get_analytics_summary() -> Dict[str, Any]:
             })
 
     return {
+        "merchant_id": effective_merchant_id,
         "capital_recovered_inr": capital_recovered_inr,
         "arbitration_penalties_avoided_inr": penalties_avoided_inr,
         "penalties_avoided_count": penalties_avoided_count,
@@ -331,7 +357,6 @@ def simulate_attack(req: SimulateAttackRequest) -> Dict[str, Any]:
 
     steps = []
     if scenario == "sweep":
-        # 5x ₹2.50 micro-probes
         for i in range(1, 6):
             res = evaluate_transaction_velocity(
                 ip_address=sim_ip,
@@ -349,7 +374,6 @@ def simulate_attack(req: SimulateAttackRequest) -> Dict[str, Any]:
                 "log_entry": res["log_entry"],
             })
     elif scenario == "burst":
-        # 10x ₹850.00 velocity surges
         for i in range(1, 11):
             res = evaluate_transaction_velocity(
                 ip_address=sim_ip,
@@ -367,7 +391,6 @@ def simulate_attack(req: SimulateAttackRequest) -> Dict[str, Any]:
                 "log_entry": res["log_entry"],
             })
     else:
-        # 1x ₹1,450.00 standard order
         res = evaluate_transaction_velocity(
             ip_address=sim_ip,
             bin_number=sim_bin,
@@ -400,7 +423,7 @@ def simulate_attack(req: SimulateAttackRequest) -> Dict[str, Any]:
 def demo_simulate_order() -> Dict[str, Any]:
     """Presenter Action A: Injects a live incoming order (+ ₹2,499.00)."""
     order_id = f"order_live_{int(time.time())}"
-    amount = 249900 # ₹2,499.00
+    amount = 249900
 
     try:
         supabase = get_supabase_client()
