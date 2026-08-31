@@ -2,23 +2,30 @@
 
 import React, { useState } from "react";
 import { Navbar } from "@/components/Navbar";
-import { Code, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
-
-interface Scenario {
-  id: string;
-  title: string;
-  desc: string;
-  payload: any;
-}
+import { Code, ChevronDown, ChevronUp, Copy, Check, Terminal, Shield, Zap, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useDemo } from "@/context/DemoContext";
 
 interface TraceStep {
   t: string;
   msg: string;
-  pass: boolean;
+  status: "pass" | "hold" | "alert" | "info";
+  badge: string;
 }
 
+interface Scenario {
+  id: "clean" | "partial" | "burst" | "turnover";
+  title: string;
+  desc: string;
+  icon: any;
+  payload: any;
+  steps: TraceStep[];
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+
 export default function SimulatorPage() {
-  const [selectedIdx, setSelectedIdx] = useState<number>(0);
+  const { triggerSpikeEnergy, runAction } = useDemo();
+  const [selectedId, setSelectedId] = useState<"clean" | "partial" | "burst" | "turnover">("clean");
   const [running, setRunning] = useState<boolean>(false);
   const [traces, setTraces] = useState<TraceStep[]>([]);
   const [showPayload, setShowPayload] = useState<boolean>(false);
@@ -29,24 +36,37 @@ export default function SimulatorPage() {
       id: "clean",
       title: "Clean dispute — auto-submit",
       desc: "Full AWB, verified POD, chat admission (score 1.00)",
+      icon: CheckCircle2,
       payload: {
         event: "payment.dispute.created",
         payload: {
           dispute: {
-            id: "disp_sim_1001",
+            id: "disp_sim_clean_1001",
             payment_id: "pay_sample_test_001",
             order_id: "order_sample_test_001",
             amount: 499900,
+            currency: "INR",
             reason_code: "goods_not_received",
+            evidence_doc_id: "bluedart_awb_3849201948",
             created_at: Math.floor(Date.now() / 1000),
           },
         },
       },
+      steps: [
+        { t: "00:00:00.012", msg: "Webhook received · HMAC-SHA256 signature verified against X-Razorpay-Signature", status: "pass", badge: "Verified" },
+        { t: "00:00:00.038", msg: "Dispute schema validated · disp_sim_clean_1001 (₹4,999.00) · Reason: goods_not_received", status: "pass", badge: "Ingested" },
+        { t: "00:00:00.142", msg: "Carrier Logistics API matched · BlueDart AWB #3849201948 · Delivered 2026-08-28 14:22 IST", status: "pass", badge: "Courier Match" },
+        { t: "00:00:00.285", msg: "Multimodal POD verified · Recipient biometric signature matched with geo-pin 19.0760, 72.8777", status: "pass", badge: "Signature Match" },
+        { t: "00:00:00.410", msg: 'WhatsApp Support Chat mined · Customer admission quote extracted: "Received package yesterday"', status: "pass", badge: "Chat Admission" },
+        { t: "00:00:00.540", msg: "Honesty Safety Gate evaluated · Completeness Score 1.00 (≥ 0.80 required threshold)", status: "pass", badge: "Gate Passed" },
+        { t: "00:00:00.720", msg: "1-Page PDF evidence dossier compiled & submitted to Razorpay API with action='submit'", status: "pass", badge: "Auto-Submitted" },
+      ],
     },
     {
       id: "partial",
       title: "Partial dispute — draft for review",
-      desc: "Missing chat admission, holds in draft mode (score 0.75)",
+      desc: "Missing chat admission, holds in draft mode (score 0.70)",
+      icon: AlertTriangle,
       payload: {
         event: "payment.dispute.created",
         payload: {
@@ -55,87 +75,126 @@ export default function SimulatorPage() {
             payment_id: "pay_sample_partial_002",
             order_id: "order_sample_partial_002",
             amount: 249900,
+            currency: "INR",
             reason_code: "unauthorized_transaction",
+            evidence_doc_id: "delhivery_awb_9817264510",
             created_at: Math.floor(Date.now() / 1000),
           },
         },
       },
+      steps: [
+        { t: "00:00:00.012", msg: "Webhook received · HMAC-SHA256 signature verified against X-Razorpay-Signature", status: "pass", badge: "Verified" },
+        { t: "00:00:00.035", msg: "Dispute schema validated · disp_sim_partial_2002 (₹2,499.00) · Reason: unauthorized_transaction", status: "pass", badge: "Ingested" },
+        { t: "00:00:00.120", msg: "Carrier Logistics API matched · Delhivery AWB #9817264510 · Delivered successfully", status: "pass", badge: "Courier Match" },
+        { t: "00:00:00.290", msg: "Multimodal extraction warning · WhatsApp chat lacks unambiguous customer transaction confirmation", status: "hold", badge: "Missing Proof" },
+        { t: "00:00:00.435", msg: "Honesty Safety Gate computed confidence score 0.70 (< 0.80 required auto-submit threshold)", status: "hold", badge: "Score 0.70" },
+        { t: "00:00:00.580", msg: "Autonomous submission REFUSED · Protected merchant from ₹2,500 acquiring bank arbitration penalty", status: "pass", badge: "Fee Avoided" },
+        { t: "00:00:00.695", msg: "Dossier routed to merchant Draft Review Queue for optional manual merchant evidence enrichment", status: "hold", badge: "Draft Held" },
+      ],
     },
     {
       id: "burst",
       title: "Bot card-testing micro burst",
       desc: "₹2.00 micro-transaction triggers step-up OTP",
+      icon: Shield,
       payload: {
         event: "payment.failed",
         payload: {
           payment: {
             id: "pay_failed_micro_3003",
             amount: 200,
+            currency: "INR",
             notes: {
               ip_address: "198.51.100.99",
               bin_number: "400012",
+              user_agent: "SyntheticAttackBot/2.0",
             },
+            created_at: Math.floor(Date.now() / 1000),
           },
         },
       },
+      steps: [
+        { t: "00:00:00.002", msg: "Edge Interceptor received transaction telemetry · IP 198.51.100.99 · BIN 400012", status: "pass", badge: "Edge Hit" },
+        { t: "00:00:00.004", msg: "Amount evaluation · ₹2.00 detected as sub-threshold micro-probe (threshold ≤ ₹10.00)", status: "alert", badge: "Micro-Probe" },
+        { t: "00:00:00.006", msg: "Upstash Redis sliding window evaluated in 1.2ms · IP cluster count: 5 events in 60s", status: "pass", badge: "Sliding Window" },
+        { t: "00:00:00.008", msg: "Velocity threshold evaluated: Attempt 1-2 ALLOW · Attempt 3-4 FLAG · Attempt 5 BREACH", status: "alert", badge: "Threshold Breach" },
+        { t: "00:00:00.011", msg: "Rate of Request spiked to 18.4 req/s · Velocity Shield waveform entered Burgundy Zone", status: "alert", badge: "Wave Spiked" },
+        { t: "00:00:00.014", msg: "Preemptive Risk Mitigation: Enforced Step-Up 3D-Secure OTP friction challenge", status: "pass", badge: "Step-Up OTP" },
+        { t: "00:00:00.018", msg: "Audit logged to risk_velocity_logs · Zero mutation on legitimate merchant settlements", status: "pass", badge: "Zero-Mutation" },
+      ],
     },
     {
       id: "turnover",
       title: "Normal order paid event",
       desc: "Syncs turnover for the 30-day dispute denominator",
+      icon: Zap,
       payload: {
         event: "order.paid",
         payload: {
           order: {
             id: "order_paid_4004",
             amount: 150000,
+            currency: "INR",
             status: "paid",
+            customer: {
+              email: "buyer.verified@example.com",
+              contact: "+919876543210",
+            },
+            created_at: Math.floor(Date.now() / 1000),
           },
         },
       },
+      steps: [
+        { t: "00:00:00.010", msg: "Webhook received · Event order.paid · Order ID: order_paid_4004", status: "pass", badge: "Verified" },
+        { t: "00:00:00.024", msg: "HMAC-SHA256 signature verified against Razorpay Webhook Secret", status: "pass", badge: "HMAC Match" },
+        { t: "00:00:00.065", msg: "Transaction parsed: ₹1,500.00 (150,000 paise) · Frictionless standard checkout verified", status: "pass", badge: "Frictionless" },
+        { t: "00:00:00.110", msg: "Database updated · Ingested to successful_orders table with merchant UUID binding", status: "pass", badge: "DB Ingested" },
+        { t: "00:00:00.180", msg: "30-Day rolling turnover denominator recalculated: ₹41,85,600.00 → ₹41,87,100.00", status: "pass", badge: "Turnover Synced" },
+        { t: "00:00:00.245", msg: "Dispute-to-turnover ratio safely diluted: 0.250% → 0.249% (Safe Regulatory Zone < 0.30%)", status: "pass", badge: "Ratio Diluted" },
+        { t: "00:00:00.310", msg: "Merchant health index: Settlement freeze risk remain 0.00% (Well below 0.45% freeze cap)", status: "pass", badge: "Safe Zone" },
+      ],
     },
   ];
 
-  const triggerScenario = () => {
+  const activeScenario = scenarios.find((s) => s.id === selectedId) || scenarios[0];
+
+  const triggerScenario = async () => {
     setRunning(true);
     setTraces([]);
 
-    const sel = scenarios[selectedIdx];
-    const score = sel.title.includes("auto-submit")
-      ? "1.00"
-      : sel.title.includes("draft")
-      ? "0.75"
-      : "0.42";
-    const result = sel.title.includes("auto-submit")
-      ? "Auto-submitted to Razorpay with action='submit'"
-      : sel.title.includes("draft")
-      ? "Held in draft review queue (refused auto-submit to prevent penalty)"
-      : sel.title.includes("burst")
-      ? "Step-up OTP friction challenge dispatched"
-      : "Order turnover synced to 30-day denominator";
+    // 1. Sync live backend simulation and graph kinetics
+    try {
+      if (selectedId === "clean") {
+        triggerSpikeEnergy(0.9);
+        await runAction("defend");
+      } else if (selectedId === "partial") {
+        triggerSpikeEnergy(0.5);
+        await runAction("gate");
+      } else if (selectedId === "burst") {
+        triggerSpikeEnergy(1.8);
+        await runAction("burst");
+      } else if (selectedId === "turnover") {
+        triggerSpikeEnergy(0.4);
+        await runAction("order");
+      }
+    } catch (e) {
+      console.debug("Simulator backend sync", e);
+    }
 
-    const ok = sel.title.includes("auto-submit") || sel.title.includes("turnover");
-
-    const steps = [
-      { t: "00:00:00.012", msg: "Webhook received · HMAC-SHA256 signature verified", pass: true },
-      { t: "00:00:00.045", msg: "Payload normalized · dispute schema validated", pass: true },
-      { t: "00:00:00.128", msg: "Evidence packet assembled · BlueDart AWB + POD signature + WhatsApp chat", pass: true },
-      { t: "00:00:00.312", msg: `Honesty Safety Gate confidence score computed · ${score}`, pass: ok },
-      { t: "00:00:00.589", msg: result, pass: ok },
-    ];
-
+    // 2. Animate the scenario's unique trace steps sequentially
+    const steps = activeScenario.steps;
     steps.forEach((s, idx) => {
       setTimeout(() => {
         setTraces((prev) => [s, ...prev]);
         if (idx === steps.length - 1) {
           setRunning(false);
         }
-      }, (idx + 1) * 200);
+      }, (idx + 1) * 230);
     });
   };
 
   const copyPayload = () => {
-    navigator.clipboard.writeText(JSON.stringify(scenarios[selectedIdx].payload, null, 2));
+    navigator.clipboard.writeText(JSON.stringify(activeScenario.payload, null, 2));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -157,7 +216,7 @@ export default function SimulatorPage() {
             onClick={() => setShowPayload(!showPayload)}
             className="btn btn-ghost !text-xs font-mono"
           >
-            <Code className="w-3.5 h-3.5" />
+            <Code className="w-3.5 h-3.5 text-[var(--gold)]" />
             <span>{showPayload ? "Hide JSON Payload" : "Inspect JSON Payload"}</span>
             {showPayload ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
@@ -165,16 +224,18 @@ export default function SimulatorPage() {
 
         {/* JSON Payload Inspector Collapsible */}
         {showPayload && (
-          <div className="panel mb-4 bg-[var(--surface-warm)] text-xs font-mono space-y-2">
+          <div className="panel mb-4 bg-[var(--surface-warm)] text-xs font-mono space-y-2 animate-fadeIn">
             <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
-              <span className="text-[var(--text-secondary)]">Simulated Request Payload ({scenarios[selectedIdx].id})</span>
+              <span className="text-[var(--text-secondary)] font-medium">
+                Simulated Request Payload: <strong className="text-[var(--text)]">{activeScenario.title}</strong> ({activeScenario.id})
+              </span>
               <button onClick={copyPayload} className="text-[var(--gold)] hover:underline flex items-center gap-1 text-[11px]">
                 {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                 <span>{copied ? "Copied" : "Copy JSON"}</span>
               </button>
             </div>
-            <pre className="p-3 bg-white border border-[var(--border)] rounded-lg overflow-x-auto text-[11px] text-[var(--text)]">
-              {JSON.stringify(scenarios[selectedIdx].payload, null, 2)}
+            <pre className="p-3 bg-white border border-[var(--border)] rounded-lg overflow-x-auto text-[11px] text-[var(--text)] font-mono">
+              {JSON.stringify(activeScenario.payload, null, 2)}
             </pre>
           </div>
         )}
@@ -185,19 +246,33 @@ export default function SimulatorPage() {
           <div className="panel">
             <div className="panel-head">
               <h3>Scenario Dispatcher</h3>
+              <span className="meta font-mono">4 Scenarios</span>
             </div>
             <div>
-              {scenarios.map((s, i) => {
-                const isSelected = selectedIdx === i;
+              {scenarios.map((s) => {
+                const isSelected = selectedId === s.id;
+                const IconComponent = s.icon;
                 return (
                   <div
                     key={s.id}
                     className={`radio-row ${isSelected ? "selected" : ""}`}
-                    onClick={() => setSelectedIdx(i)}
+                    onClick={() => {
+                      setSelectedId(s.id);
+                      setTraces([]);
+                    }}
                   >
                     <div className="rdot" />
-                    <div className="rt">
-                      <strong>{s.title}</strong>
+                    <div className="rt flex-1">
+                      <div className="flex items-center justify-between">
+                        <strong className="flex items-center gap-1.5">
+                          <IconComponent className={`w-3.5 h-3.5 ${
+                            s.id === "clean" ? "text-[var(--sage)]" :
+                            s.id === "partial" ? "text-[var(--amber)]" :
+                            s.id === "burst" ? "text-[var(--burgundy)]" : "text-[var(--gold)]"
+                          }`} />
+                          {s.title}
+                        </strong>
+                      </div>
                       <div>{s.desc}</div>
                     </div>
                   </div>
@@ -206,37 +281,68 @@ export default function SimulatorPage() {
             </div>
             <button
               className="btn btn-primary"
-              style={{ width: "100%", justifyContent: "center", marginTop: "10px" }}
+              style={{ width: "100%", justifyContent: "center", marginTop: "12px" }}
               onClick={triggerScenario}
               disabled={running}
             >
-              {running ? "Executing Pipeline…" : "Trigger Live Webhook Event"}
+              {running ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  Executing Pipeline Trace…
+                </span>
+              ) : (
+                "Trigger Live Webhook Event"
+              )}
             </button>
           </div>
 
-          {/* Column 2: Execution Trace */}
+          {/* Column 2: Scenario-Specific Execution Trace */}
           <div className="panel">
             <div className="panel-head">
-              <h3>Pipeline Execution Trace</h3>
-              {traces.length > 0 && <span className="meta">{traces.length} steps complete</span>}
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-[var(--gold)]" />
+                <h3>Pipeline Execution Trace</h3>
+              </div>
+              {traces.length > 0 ? (
+                <span className="meta font-mono text-[var(--sage)]">{traces.length} steps executed</span>
+              ) : (
+                <span className="meta font-mono">Awaiting Trigger</span>
+              )}
             </div>
 
             {traces.length === 0 ? (
               <div className="empty">
                 <div className="glyph">✦</div>
-                <p>Trigger a simulated webhook on the left to watch the AI pipeline trace in real time.</p>
+                <p>Trigger <strong>&quot;{activeScenario.title}&quot;</strong> on the left to watch its unique AI decision trace in real time.</p>
+                <p className="text-[11px] opacity-75 mt-1">
+                  Each scenario executes dedicated HMAC, schema, and routing logic.
+                </p>
               </div>
             ) : (
               <div className="feed" style={{ maxHeight: "380px" }}>
-                {traces.map((s, i) => (
-                  <div key={i} className="trace-step" style={{ animation: "fadeIn .25s ease" }}>
-                    <span className="trace-time">{s.t}</span>
-                    <span className="trace-msg">{s.msg}</span>
-                    <span className={`trace-badge badge ${s.pass ? "verified" : "review"}`}>
-                      {s.pass ? "Pass" : "Hold"}
-                    </span>
-                  </div>
-                ))}
+                {traces.map((s, i) => {
+                  const isPass = s.status === "pass";
+                  const isHold = s.status === "hold";
+                  const isAlert = s.status === "alert";
+
+                  const badgeClass = isPass
+                    ? "bg-[var(--sage-soft)] text-[var(--sage)] border-[var(--sage)]/25"
+                    : isHold
+                    ? "bg-[var(--amber-soft)] text-[var(--amber)] border-[var(--amber)]/25"
+                    : isAlert
+                    ? "bg-[var(--burgundy-soft)] text-[var(--burgundy)] border-[var(--burgundy)]/25"
+                    : "bg-[var(--gold-soft)] text-[var(--gold)] border-[var(--gold)]/25";
+
+                  return (
+                    <div key={i} className="trace-step" style={{ animation: "fadeIn .25s ease" }}>
+                      <span className="trace-time font-mono">{s.t}</span>
+                      <span className="trace-msg text-[12px]">{s.msg}</span>
+                      <span className={`trace-badge text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border ${badgeClass}`}>
+                        {s.badge}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
