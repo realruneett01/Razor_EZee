@@ -82,11 +82,13 @@ def get_system_status() -> Dict[str, Any]:
 
 
 @router.get("/disputes")
+@router.get("/disputes/feed")
 def get_disputes(
     merchant_id: Optional[str] = Query(None, description="Optional merchant ID filter"),
     x_merchant_id: Optional[str] = Header(None, alias="X-Merchant-Id"),
 ) -> List[Dict[str, Any]]:
-    """Fetches list of dispute records scoped to merchant_id."""
+    """Fetches list of dispute records scoped to merchant_id.
+    If custom merchant ID has 0 records in DB, returns empty array rather than demo records."""
     effective_merchant_id = merchant_id or x_merchant_id or DEMO_MERCHANT_ID
     try:
         supabase = get_supabase_client()
@@ -95,18 +97,23 @@ def get_disputes(
             query = query.eq("merchant_id", effective_merchant_id)
 
         res = query.order("created_at", desc=True).limit(50).execute()
-        if res.data and isinstance(res.data, list) and len(res.data) > 0:
-            return [cast(Dict[str, Any], d) for d in res.data if isinstance(d, dict)]
+        if res.data and isinstance(res.data, list):
+            # For custom merchant, return real DB list even if empty
+            if effective_merchant_id != DEMO_MERCHANT_ID:
+                return [cast(Dict[str, Any], d) for d in res.data if isinstance(d, dict)]
+            # For demo merchant, if DB has records return them
+            if len(res.data) > 0:
+                return [cast(Dict[str, Any], d) for d in res.data if isinstance(d, dict)]
     except Exception as e:
-        logger.debug(f"Supabase unavailable for /api/disputes (using local fallback): {e}")
+        logger.debug(f"Supabase unavailable for /api/disputes: {e}")
+
+    # If scoped to custom merchant with no DB connection / records, return pristine empty list
+    if effective_merchant_id and effective_merchant_id != DEMO_MERCHANT_ID:
+        return [d for d in LOCAL_DISPUTES if d.get("merchant_id") == effective_merchant_id]
 
     if not LOCAL_DISPUTES:
         from scripts.demo_reset import reset_demo_state
         reset_demo_state()
-
-    if effective_merchant_id:
-        scoped = [d for d in LOCAL_DISPUTES if d.get("merchant_id") == effective_merchant_id]
-        return scoped if scoped else LOCAL_DISPUTES
 
     return LOCAL_DISPUTES
 
@@ -235,9 +242,11 @@ def get_analytics_summary(
     merchant_id: Optional[str] = Query(None, description="Optional merchant ID filter"),
     x_merchant_id: Optional[str] = Header(None, alias="X-Merchant-Id"),
 ) -> Dict[str, Any]:
-    """Computes immutable, mathematically verified risk analytics scoped to authenticated merchant_id."""
+    """Computes immutable, mathematically verified risk analytics scoped to authenticated merchant_id.
+    When a new merchant account is created with zero history, all metrics are strictly 0.00 / clean."""
     effective_merchant_id = merchant_id or x_merchant_id or DEMO_MERCHANT_ID
     cutoff_30d = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    is_demo_account = (effective_merchant_id == DEMO_MERCHANT_ID)
 
     disputes: List[Dict[str, Any]] = []
     orders: List[Dict[str, Any]] = []
@@ -279,10 +288,42 @@ def get_analytics_summary(
         velocity_logs = [cast(Dict[str, Any], v) for v in raw_velocity if isinstance(v, dict)]
 
     except Exception as e:
-        logger.debug(f"Supabase unavailable for /api/analytics/summary (using memory sync): {e}")
-        disputes = get_disputes(merchant_id=effective_merchant_id)
-        orders = [{"amount": 299900} for _ in range(140)]
-        velocity_logs = []
+        logger.debug(f"Supabase query in /api/analytics/summary: {e}")
+        if is_demo_account:
+            disputes = get_disputes(merchant_id=effective_merchant_id)
+            orders = [{"amount": 299900} for _ in range(140)]
+            velocity_logs = []
+        else:
+            disputes = []
+            orders = []
+            velocity_logs = []
+
+    # If this is a fresh non-demo merchant account with 0 records in DB, return clean zeroes
+    if not is_demo_account and len(disputes) == 0 and len(orders) == 0:
+        return {
+            "merchant_id": effective_merchant_id,
+            "capital_recovered_inr": 0.0,
+            "arbitration_penalties_avoided_inr": 0.0,
+            "penalties_avoided_count": 0,
+            "dispute_ratio_percentage": 0.0,
+            "dispute_ratio_status": "safe",
+            "total_disputes_30d": 0,
+            "total_orders_30d": 0,
+            "velocity_blocks_count": 0,
+            "trajectory": {"safe_pct": 100.0, "watch_pct": 0.0, "danger_pct": 0.0},
+            "carrier_win_rates": [
+                {"id": "bluedart", "carrier_name": "BlueDart Express", "win_rate_pct": 0.0, "total_disputes": 0, "notes": "No shipments logged yet for this account."},
+                {"id": "delhivery", "carrier_name": "Delhivery Logistics", "win_rate_pct": 0.0, "total_disputes": 0, "notes": "No shipments logged yet for this account."},
+                {"id": "shadowfax", "carrier_name": "Shadowfax", "win_rate_pct": 0.0, "total_disputes": 0, "notes": "No shipments logged yet for this account."},
+            ],
+            "reason_breakdown": [
+                {"code": "goods_not_received", "label": "Goods not received", "count": 0, "pct": 0.0, "color": "var(--gold)"},
+                {"code": "unauthorized_transaction", "label": "Unauthorized transaction", "count": 0, "pct": 0.0, "color": "var(--taupe)"},
+                {"code": "duplicate_charge", "label": "Duplicate charge", "count": 0, "pct": 0.0, "color": "var(--amber)"},
+                {"code": "service_not_provided", "label": "Service not provided", "count": 0, "pct": 0.0, "color": "var(--rose)"},
+            ],
+            "last_synced_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     # --- Metric A: Net Capital Recovered ---
     won_disputes = [d for d in disputes if d.get("status") == "won"]
@@ -300,20 +341,20 @@ def get_analytics_summary(
         d for d in disputes 
         if (float(d.get("completeness_score") or 0) < 0.80) or not bool(d.get("auto_submitted"))
     ]
-    penalties_avoided_count = len(draft_disputes) if draft_disputes else 10
+    penalties_avoided_count = len(draft_disputes) if draft_disputes else (10 if is_demo_account else 0)
     penalties_avoided_inr = penalties_avoided_count * 2500
 
     # --- Metric C: Acquiring Bank Settlement Risk Ratio ---
     ratio_report = get_dispute_ratio_report(days=30, merchant_id=effective_merchant_id)
     dispute_ratio_pct = float(ratio_report["dispute_ratio_percentage"])
-    if dispute_ratio_pct == 0.0 and len(disputes) > 0:
+    if dispute_ratio_pct == 0.0 and len(disputes) > 0 and is_demo_account:
         dispute_ratio_pct = 0.25
     ratio_status = str(ratio_report["status"])
 
     trajectory = {
-        "safe_pct": 46.0,
-        "watch_pct": 24.0,
-        "danger_pct": 12.0,
+        "safe_pct": 46.0 if is_demo_account else 100.0,
+        "watch_pct": 24.0 if is_demo_account else 0.0,
+        "danger_pct": 12.0 if is_demo_account else 0.0,
     }
 
     # --- Metric D: Velocity Shield Blocks ---
@@ -321,13 +362,13 @@ def get_analytics_summary(
         v for v in velocity_logs 
         if str(v.get("risk_action_taken")) in ["CHALLENGE_STEP_UP_OTP", "FLAG_FOR_REVIEW", "BLOCK"]
     ]
-    velocity_blocks_count = len(blocked_events) if len(blocked_events) > 0 else 1247
+    velocity_blocks_count = len(blocked_events) if len(blocked_events) > 0 else (1247 if is_demo_account else 0)
 
     # --- Metric E: Logistics Carrier Win-Rate Index ---
     carrier_stats: Dict[str, Dict[str, Any]] = {
-        "bluedart": {"name": "BlueDart Express", "won": 0, "total": 0, "default_win_rate": 92.8, "notes": "High-resolution digital signature pads give strong POD verification."},
-        "delhivery": {"name": "Delhivery Logistics", "won": 0, "total": 0, "default_win_rate": 90.9, "notes": "Automated OTP delivery confirmation offers unassailable courier proof."},
-        "shadowfax": {"name": "Shadowfax", "won": 0, "total": 0, "default_win_rate": 83.3, "notes": "Hyperlocal geo-coordinates provide strong non-repudiation backing."},
+        "bluedart": {"name": "BlueDart Express", "won": 0, "total": 0, "default_win_rate": 92.8 if is_demo_account else 0.0, "notes": "High-resolution digital signature pads give strong POD verification."},
+        "delhivery": {"name": "Delhivery Logistics", "won": 0, "total": 0, "default_win_rate": 90.9 if is_demo_account else 0.0, "notes": "Automated OTP delivery confirmation offers unassailable courier proof."},
+        "shadowfax": {"name": "Shadowfax", "won": 0, "total": 0, "default_win_rate": 83.3 if is_demo_account else 0.0, "notes": "Hyperlocal geo-coordinates provide strong non-repudiation backing."},
     }
 
     for d in disputes:
@@ -352,9 +393,9 @@ def get_analytics_summary(
 
     # --- Metric F: Dispute Reason Breakdown ---
     reason_palette: Dict[str, Dict[str, Any]] = {
-        "goods_not_received": {"label": "Goods not received", "color": "var(--gold)", "default_pct": 57.1},
-        "unauthorized_transaction": {"label": "Unauthorized transaction", "color": "var(--taupe)", "default_pct": 28.6},
-        "duplicate_charge": {"label": "Duplicate charge", "color": "var(--amber)", "default_pct": 14.3},
+        "goods_not_received": {"label": "Goods not received", "color": "var(--gold)", "default_pct": 57.1 if is_demo_account else 0.0},
+        "unauthorized_transaction": {"label": "Unauthorized transaction", "color": "var(--taupe)", "default_pct": 28.6 if is_demo_account else 0.0},
+        "duplicate_charge": {"label": "Duplicate charge", "color": "var(--amber)", "default_pct": 14.3 if is_demo_account else 0.0},
         "service_not_provided": {"label": "Service not provided", "color": "var(--rose)", "default_pct": 0.0},
     }
 
