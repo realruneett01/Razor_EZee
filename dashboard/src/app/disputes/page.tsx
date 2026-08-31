@@ -16,11 +16,13 @@ import {
   PenTool, 
   Sparkles,
   ChevronRight,
+  ChevronDown,
   ShieldCheck,
   AlertTriangle,
   Upload,
   X,
-  FileCode
+  FileCode,
+  Bug
 } from "lucide-react";
 import { DisputeItem } from "@/components/DisputeFeed";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -37,6 +39,7 @@ export default function DisputeStudioPage() {
   const [selectedDispute, setSelectedDispute] = useState<DisputeItem | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [showErrorAccordion, setShowErrorAccordion] = useState<boolean>(false);
 
   // Live Multimodal Upload & OCR State
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
@@ -431,6 +434,27 @@ export default function DisputeStudioPage() {
                   </div>
                 </div>
 
+                {/* Optional Razorpay Gateway Error Accordion */}
+                {selectedDispute.last_error && (
+                  <div className="border border-[var(--rose)]/30 bg-[var(--rose-soft)] rounded-xl p-3 text-xs font-mono space-y-2">
+                    <div
+                      onClick={() => setShowErrorAccordion(!showErrorAccordion)}
+                      className="flex items-center justify-between cursor-pointer text-[var(--rose)] font-semibold"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Bug className="w-4 h-4" />
+                        <span>Razorpay Gateway Rejection Captured in Audit Ledger</span>
+                      </div>
+                      {showErrorAccordion ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </div>
+                    {showErrorAccordion && (
+                      <pre className="p-2.5 bg-black/10 rounded-lg text-[10.5px] overflow-x-auto text-[var(--rose)] whitespace-pre-wrap">
+                        {selectedDispute.last_error}
+                      </pre>
+                    )}
+                  </div>
+                )}
+
                 {/* Honesty Safety Gate Verdict Bar */}
                 <div className={`p-3.5 rounded-xl border flex items-center justify-between text-xs font-mono ${
                   (selectedDispute.completeness_score ?? 0) >= 0.8
@@ -504,7 +528,7 @@ export default function DisputeStudioPage() {
                   <div className="p-3 bg-[var(--surface-warm)] border border-[var(--border)] rounded-xl space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold flex items-center gap-1.5 text-[var(--text)]">
-                        <MessageSquare className="w-3.5 h-3.5 text-[var(--gold)]" /> Customer Support Admission
+                        <MessageSquare className="w-3.5 h-3.5 text-[var(--gold)]" /> WhatsApp Support Chat Audit (DPDP-Masked)
                       </span>
                       {selectedDispute.contradiction_found ? (
                         <span className="text-[11px] font-mono text-[var(--sage)] font-medium">✓ Admission Extracted</span>

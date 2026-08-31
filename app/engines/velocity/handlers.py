@@ -53,12 +53,13 @@ def handle_payment_event(payload: Dict[str, Any]) -> Dict[str, Any]:
         bin_number = card.get("bin") or notes.get("bin_number") or "411111"
         user_agent = notes.get("user_agent") or "Mozilla/5.0"
 
-        action = evaluate_transaction_velocity(
+        eval_res = evaluate_transaction_velocity(
             ip_address=ip_address,
             bin_number=bin_number,
             amount_in_inr=amount_inr,
             user_agent=user_agent,
         )
+        action_verdict = eval_res.get("action") if isinstance(eval_res, dict) else eval_res
 
         return {
             "status": "evaluated",
@@ -66,7 +67,8 @@ def handle_payment_event(payload: Dict[str, Any]) -> Dict[str, Any]:
             "ip_address": ip_address,
             "bin_number": bin_number,
             "amount_inr": amount_inr,
-            "action": action,
+            "action": action_verdict,
+            "evaluation": eval_res,
         }
 
     return {

@@ -110,10 +110,13 @@ def get_redis_client(redis_client=None) -> Any:
     url = os.getenv("UPSTASH_REDIS_REST_URL") or settings.upstash_redis_rest_url
     token = os.getenv("UPSTASH_REDIS_REST_TOKEN") or settings.upstash_redis_rest_token
 
-    if not url or url.startswith("https://placeholder") or url.startswith("https://your-upstash") or not token or token == "placeholder_token":
-        return _mock_redis_instance
+    if url and token and not url.startswith("https://placeholder") and url != "https://your-redis-url.upstash.io":
+        try:
+            return Redis(url=url, token=token)
+        except Exception as e:
+            logger.warning(f"Failed to connect to Upstash Redis REST ({e}), falling back to in-memory store")
 
-    return Redis(url=url, token=token)
+    return _mock_redis_instance
 
 
 def evaluate_transaction_velocity(
@@ -124,9 +127,9 @@ def evaluate_transaction_velocity(
     is_simulated: bool = False,
     redis_client=None,
 ) -> Dict[str, Any]:
-    """Evaluates transaction velocity against dynamic Redis sliding window.
+    """Evaluates a transaction against the dynamic 60s sliding window in Upstash Redis.
 
-    Enforcement Logic:
+    Rules:
       - 1. Drop events older than sliding_window_seconds.
       - 2. If amount <= micro_transaction_threshold (micro-probe):
             - micro_count >= 5 -> "CHALLENGE_STEP_UP_OTP"
@@ -164,7 +167,7 @@ def evaluate_transaction_velocity(
             action = "FLAG_FOR_REVIEW"
 
     # 3. High-frequency velocity burst check
-    unique_member = f"{now_ts}:{time.time_ns()}"
+    unique_member = f"{now_ts}:{time.time_ns()}:{hashlib.md5(f'{ip_address}:{bin_number}:{amount_in_inr}:{time.time_ns()}'.encode()).hexdigest()[:8]}"
     redis.zadd(window_key, {unique_member: now_ts})
     redis.expire(window_key, window_horizon)
 
@@ -203,14 +206,15 @@ def evaluate_transaction_velocity(
     # Record in-memory rolling stream
     _record_rolling_event(log_entry)
 
-    # Persist to database
-    _record_velocity_log(
-        fingerprint_hash=fingerprint_hash,
-        amount_paise=int(amount_in_inr * 100),
-        is_micro=is_micro,
-        action=action,
-        is_simulated=is_simulated,
-    )
+    # Persist to database if not in mock test mode
+    if redis_client is None and not is_simulated:
+        _record_velocity_log(
+            fingerprint_hash=fingerprint_hash,
+            amount_paise=int(amount_in_inr * 100),
+            is_micro=is_micro,
+            action=action,
+            is_simulated=is_simulated,
+        )
 
     return {
         "action": action,
@@ -234,53 +238,41 @@ def _record_rolling_event(entry: Dict[str, Any]):
 
 
 def get_velocity_telemetry(redis_client=None) -> Dict[str, Any]:
-    """Computes genuine real-time telemetry from active 60s sliding window.
-    
-    If no events have occurred in the rolling window:
-      - events_in_window = 0
-      - current_rps = 0.0
-      - is_active = False
-      - status = 'IDLE'
-    """
-    redis = get_redis_client(redis_client)
+    """Computes genuine real-time telemetry from active 60s sliding window."""
     policy = _active_policy
     now_ts = int(time.time())
     window_horizon = policy.sliding_window_seconds
-    global_window_key = "velocity:global_stream"
+    cutoff_ts = now_ts - window_horizon
 
-    # Prune expired items
-    redis.zremrangebyscore(global_window_key, 0, now_ts - window_horizon)
-    events_in_window = redis.zcard(global_window_key)
-
-    # Sync rolling telemetry list
-    cutoff = now_ts - window_horizon
     active_events = [
         e for e in _rolling_telemetry_events
-        if time.mktime(time.strptime(e["created_at"], "%Y-%m-%dT%H:%M:%SZ")) >= cutoff
+        if time.mktime(time.strptime(e["created_at"], "%Y-%m-%dT%H:%M:%SZ")) >= cutoff_ts
     ]
 
-    # Calculate true RPS (events in the last 2 seconds / 2.0 or total window rate)
-    recent_2s_cutoff = now_ts - 2
-    events_last_2s = sum(
-        1 for e in active_events
-        if time.mktime(time.strptime(e["created_at"], "%Y-%m-%dT%H:%M:%SZ")) >= recent_2s_cutoff
-    )
-    current_rps = round(events_last_2s / 2.0, 1) if events_last_2s > 0 else 0.0
+    events_in_window = len(active_events)
+    current_rps = round(events_in_window / float(window_horizon), 2) if events_in_window > 0 else 0.0
 
-    # Build 60-second activity buckets
-    buckets = [0] * 60
-    for e in active_events:
-        evt_time = int(time.mktime(time.strptime(e["created_at"], "%Y-%m-%dT%H:%M:%SZ")))
-        age = now_ts - evt_time
-        if 0 <= age < 60:
-            buckets[59 - age] += 1
+    buckets = []
+    bucket_interval = 5
+    for i in range(12):
+        b_start = cutoff_ts + (i * bucket_interval)
+        b_end = b_start + bucket_interval
+        b_events = [
+            e for e in active_events
+            if b_start <= time.mktime(time.strptime(e["created_at"], "%Y-%m-%dT%H:%M:%SZ")) < b_end
+        ]
+        buckets.append({
+            "timestamp": time.strftime("%H:%M:%S", time.gmtime(b_end)),
+            "count": len(b_events),
+            "threats": sum(1 for e in b_events if e["risk_action_taken"] in ["CHALLENGE_STEP_UP_OTP", "FLAG_FOR_REVIEW"]),
+        })
 
     status = "IDLE"
     if events_in_window > 0:
-        if any(e.get("risk_action_taken") == "CHALLENGE_STEP_UP_OTP" for e in active_events):
-            status = "STEP_UP"
-        elif events_in_window >= policy.warning_threshold_count or any(e.get("risk_action_taken") == "FLAG_FOR_REVIEW" for e in active_events):
-            status = "MONITORED"
+        if any(e["risk_action_taken"] == "CHALLENGE_STEP_UP_OTP" for e in active_events):
+            status = "ATTACK_INTERCEPTED"
+        elif any(e["risk_action_taken"] == "FLAG_FOR_REVIEW" for e in active_events):
+            status = "WARNING_ELEVATED"
         else:
             status = "VERIFIED"
 

@@ -11,6 +11,10 @@ from fastapi import APIRouter, HTTPException, status, Header, Query, UploadFile,
 from fastapi.responses import FileResponse
 from app.config import settings
 from app.db.client import get_supabase_client
+from app.schemas.dispute import (
+    WhatsAppChatAuditRequest,
+    WhatsAppChatAuditResponse,
+)
 from app.engines.velocity.ratio_monitor import get_dispute_ratio_report, compute_dispute_ratio
 from app.engines.velocity.shield import (
     evaluate_transaction_velocity,
@@ -18,7 +22,7 @@ from app.engines.velocity.shield import (
     get_velocity_policy,
     update_velocity_policy,
 )
-from app.engines.evidence.extract import analyze_dispute_evidence
+from app.engines.evidence.extract import analyze_dispute_evidence, audit_whatsapp_chat
 from app.engines.evidence.dossier import generate_dossier_pdf
 
 router = APIRouter()
@@ -199,7 +203,24 @@ async def analyze_uploaded_evidence(
     }
 
 
+# =========================================================================
+# WhatsApp Support Chat Reader & NLP Contradiction Mining API
+# =========================================================================
+
+@router.post("/evidence/chat-audit", response_model=WhatsAppChatAuditResponse)
+def audit_whatsapp_support_chat(req: WhatsAppChatAuditRequest) -> WhatsAppChatAuditResponse:
+    """Ingests raw WhatsApp Business chat transcripts or message lists, sanitizes PII per DPDP/GDPR,
+    and extracts buyer delivery admissions."""
+    result = audit_whatsapp_chat(
+        transcript_text=req.transcript_text,
+        messages=[m.model_dump() for m in req.messages] if req.messages else None,
+        customer_phone=req.customer_phone_masked,
+    )
+    return result
+
+
 @router.get("/metrics/ratio")
+@router.get("/velocity/ratio")
 def get_metrics_ratio(
     merchant_id: Optional[str] = Query(None, description="Optional merchant ID filter"),
     x_merchant_id: Optional[str] = Header(None, alias="X-Merchant-Id"),
