@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { DemoProvider } from "@/context/DemoContext";
 
 export const metadata: Metadata = {
   title: "razor·ez — Autonomous Risk & Dispute Defense",
@@ -22,7 +23,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        {children}
+        <DemoProvider>
+          {children}
+        </DemoProvider>
       </body>
     </html>
   );

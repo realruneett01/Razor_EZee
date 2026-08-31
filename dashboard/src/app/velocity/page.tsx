@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Navbar } from "@/components/Navbar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatFingerprint, formatTxnCategory } from "@/lib/formatters";
+import { useDemo } from "@/context/DemoContext";
 
 interface TelemetryResponse {
   is_active: boolean;
@@ -36,6 +37,7 @@ interface TelemetryEntry {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 
 export default function VelocityShieldPage() {
+  const { spikeEnergy, lastEvent } = useDemo();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const spikeEnergyRef = useRef<number>(0);
   const activityIntensityRef = useRef<number>(0); // Driven strictly by actual RPS / events
@@ -71,7 +73,7 @@ export default function VelocityShieldPage() {
 
         // Drive wave activity strictly from real events
         const maxBucket = Math.max(...data.timeline_60s, 0);
-        activityIntensityRef.current = Math.min(1.5, (data.events_in_window * 0.1) + (data.current_rps * 0.4) + (maxBucket * 0.2));
+        activityIntensityRef.current = Math.min(1.8, (data.events_in_window * 0.1) + (data.current_rps * 0.4) + (maxBucket * 0.25));
 
         if (data.policy) {
           setProbeCeiling(data.policy.micro_transaction_threshold);
@@ -111,7 +113,17 @@ export default function VelocityShieldPage() {
     }
   }, []);
 
-  // Poll real telemetry every 1.5s (Zero polling interval artifacts)
+  // Sync when presenter triggers a live event from anywhere in the app
+  useEffect(() => {
+    if (spikeEnergy > 0) {
+      spikeEnergyRef.current = Math.max(spikeEnergyRef.current, spikeEnergy);
+      activityIntensityRef.current = Math.max(activityIntensityRef.current, 1.4);
+      fetchTelemetry();
+      fetchLogs();
+    }
+  }, [spikeEnergy, lastEvent, fetchTelemetry, fetchLogs]);
+
+  // Poll real telemetry every 1.5s
   useEffect(() => {
     fetchTelemetry();
     fetchLogs();
@@ -141,7 +153,7 @@ export default function VelocityShieldPage() {
     }
   };
 
-  // 4. Waveform Canvas Renderer (With True Zero-State / Flatline Handling)
+  // 4. Waveform Canvas Renderer (With True Zero-State & Live Spike Ignitions)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -236,20 +248,20 @@ export default function VelocityShieldPage() {
           echoY = baselineY + 12 + breath + py * 0.2;
         } else {
           // ACTIVE TELEMETRY STATE: Dynamic wave scaling proportionally with real event volume
-          const waveSpeed = 1.2 + intensity * 1.5;
-          const wave1 = Math.sin(i * 0.09 - elapsed * waveSpeed) * (8 + intensity * 12);
+          const waveSpeed = 1.4 + intensity * 1.6;
+          const wave1 = Math.sin(i * 0.09 - elapsed * waveSpeed) * (8 + intensity * 14);
           const wave2 = Math.sin(i * 0.04 - elapsed * (waveSpeed * 0.5)) * (4 + intensity * 8);
-          const microNoise = Math.sin(elapsed * 3.5 + i * 0.3) * (1.5 + intensity * 2);
+          const microNoise = Math.sin(elapsed * 3.8 + i * 0.3) * (1.5 + intensity * 3);
 
           // Kinetic attack burst profile centered on canvas
-          const spikeProfile = spike * Math.exp(-Math.pow(i - 65, 2) / 140) * 65;
+          const spikeProfile = spike * Math.exp(-Math.pow(i - 65, 2) / 130) * 72;
 
           y = baselineY - (wave1 + wave2 + microNoise + spikeProfile) + py;
-          y = Math.max(H * 0.15, Math.min(H * 0.88, y));
+          y = Math.max(H * 0.12, Math.min(H * 0.88, y));
 
-          const echoWave = Math.sin(i * 0.07 - elapsed * (waveSpeed * 0.8) + 0.8) * (5 + intensity * 6);
+          const echoWave = Math.sin(i * 0.07 - elapsed * (waveSpeed * 0.8) + 0.8) * (5 + intensity * 7);
           echoY = baselineY + 14 - (echoWave + spikeProfile * 0.4) + py;
-          echoY = Math.max(H * 0.2, Math.min(H * 0.92, echoY));
+          echoY = Math.max(H * 0.18, Math.min(H * 0.92, echoY));
         }
 
         points.push({ x, y });
@@ -267,8 +279,8 @@ export default function VelocityShieldPage() {
       ctx.closePath();
 
       const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, isIdle ? "rgba(176,125,58,0.02)" : "rgba(176,125,58,0.08)");
-      grad.addColorStop(0.5, "rgba(176,125,58,0.02)");
+      grad.addColorStop(0, isIdle ? "rgba(176,125,58,0.02)" : "rgba(176,125,58,0.10)");
+      grad.addColorStop(0.5, "rgba(176,125,58,0.03)");
       grad.addColorStop(1, "rgba(176,125,58,0.0)");
       ctx.fillStyle = grad;
       ctx.fill();
@@ -280,7 +292,7 @@ export default function VelocityShieldPage() {
           if (i === 0) ctx.moveTo(echoPoints[i].x, echoPoints[i].y);
           else ctx.lineTo(echoPoints[i].x, echoPoints[i].y);
         }
-        ctx.strokeStyle = "rgba(176,125,58,0.18)";
+        ctx.strokeStyle = "rgba(176,125,58,0.20)";
         ctx.lineWidth = 1.4;
         ctx.stroke();
       }
@@ -291,7 +303,7 @@ export default function VelocityShieldPage() {
         if (i === 0) ctx.moveTo(points[i].x, points[i].y);
         else ctx.lineTo(points[i].x, points[i].y);
       }
-      ctx.strokeStyle = isIdle ? "rgba(176,125,58,0.08)" : "rgba(176,125,58,0.15)";
+      ctx.strokeStyle = isIdle ? "rgba(176,125,58,0.08)" : "rgba(176,125,58,0.18)";
       ctx.lineWidth = isIdle ? 3 : 6;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
@@ -306,8 +318,8 @@ export default function VelocityShieldPage() {
       ctx.strokeStyle = isIdle ? "rgba(176,125,58,0.45)" : "#B07D3A";
       ctx.lineWidth = isIdle ? 1.5 : 2.2;
       if (!isIdle) {
-        ctx.shadowColor = "rgba(176,125,58,0.30)";
-        ctx.shadowBlur = 8;
+        ctx.shadowColor = "rgba(176,125,58,0.35)";
+        ctx.shadowBlur = 10;
       }
       ctx.stroke();
       ctx.shadowBlur = 0;
@@ -322,23 +334,23 @@ export default function VelocityShieldPage() {
 
         if (!isIdle) {
           ctx.beginPath();
-          ctx.arc(lastPt.x - 2, lastPt.y, 7, 0, Math.PI * 2);
-          ctx.strokeStyle = "rgba(176,125,58,0.35)";
+          ctx.arc(lastPt.x - 2, lastPt.y, 8, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(176,125,58,0.40)";
           ctx.lineWidth = 1.5;
           ctx.stroke();
         }
       }
 
-      // 6. Burst Particles
+      // 6. Burst Particles on Spike
       if (spikeEnergyRef.current > 0.25) {
-        for (let k = 0; k < 6; k++) {
-          const si = 65 + Math.floor((Math.random() - 0.5) * 24);
+        for (let k = 0; k < 7; k++) {
+          const si = 65 + Math.floor((Math.random() - 0.5) * 26);
           if (si >= 0 && si < points.length) {
-            const sx = points[si].x + (Math.random() * 24 - 12);
-            const sy = points[si].y + (Math.random() * 20 - 10);
+            const sx = points[si].x + (Math.random() * 26 - 13);
+            const sy = points[si].y + (Math.random() * 22 - 11);
             ctx.beginPath();
-            ctx.arc(sx, sy, Math.random() * 1.8 + 0.8, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(176,125,58,${spikeEnergyRef.current * 0.6})`;
+            ctx.arc(sx, sy, Math.random() * 2.0 + 0.8, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(176,125,58,${spikeEnergyRef.current * 0.7})`;
             ctx.fill();
           }
         }
@@ -374,10 +386,11 @@ export default function VelocityShieldPage() {
     };
   }, []);
 
-  // 5. Real Backend Attack Simulator Dispatcher
+  // 5. Attack Simulator Dispatcher
   const handleSimulateAttack = async (scenario: "sweep" | "burst" | "standard") => {
     setSimulating(true);
-    spikeEnergyRef.current = 1.4;
+    spikeEnergyRef.current = 1.5;
+    activityIntensityRef.current = 1.4;
 
     try {
       const res = await fetch(`${API_BASE_URL}/velocity/simulate`, {
@@ -389,7 +402,6 @@ export default function VelocityShieldPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.steps && data.steps.length > 0) {
-          // Progressively display each step from real backend evaluation
           for (const step of data.steps) {
             const entry: TelemetryEntry = {
               id: formatFingerprint(step.log_entry.fingerprint_hash),
@@ -402,7 +414,7 @@ export default function VelocityShieldPage() {
               isSimulated: true,
             };
             setFeedData((prev) => [entry, ...prev.slice(0, 19)]);
-            spikeEnergyRef.current = 1.0;
+            spikeEnergyRef.current = 1.2;
             await new Promise((r) => setTimeout(r, 220));
           }
         }
@@ -427,7 +439,7 @@ export default function VelocityShieldPage() {
           <p>Zero-mutation edge defense against card-testing and velocity bursts.</p>
         </div>
 
-        {/* Waveform Panel with Real Zero-State Flatline Indicator */}
+        {/* Waveform Panel with Real-Time Spike Reaction */}
         <div className="wave-panel">
           <canvas ref={canvasRef} className="wave-canvas" style={{ width: "100%", height: "200px" }} />
           <div className="wave-overlay">
