@@ -10,6 +10,8 @@ export interface DemoEvent {
   data?: any;
 }
 
+export const DEFAULT_DEMO_MERCHANT_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+
 interface DemoContextType {
   isPresenterOpen: boolean;
   setIsPresenterOpen: (open: boolean) => void;
@@ -21,6 +23,12 @@ interface DemoContextType {
   runAction: (action: "order" | "burst" | "defend" | "gate" | "reset") => Promise<void>;
   runAutoplayPitch: () => Promise<void>;
   stopAutoplay: () => void;
+  // Global Account Scoping
+  merchantMode: "demo" | "custom";
+  setMerchantMode: (mode: "demo" | "custom") => void;
+  customMerchantId: string;
+  setCustomMerchantId: (id: string) => void;
+  effectiveMerchantId: string;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
@@ -33,6 +41,37 @@ export const DemoProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [activeNarrative, setActiveNarrative] = useState<string | null>(null);
   const [lastEvent, setLastEvent] = useState<DemoEvent | null>(null);
   const [spikeEnergy, setSpikeEnergy] = useState<number>(0);
+
+  // Global Account Mode (Default is "demo" for live judge showcase)
+  const [merchantMode, setMerchantModeState] = useState<"demo" | "custom">("demo");
+  const [customMerchantId, setCustomMerchantIdState] = useState<string>("");
+
+  useEffect(() => {
+    try {
+      const storedMode = localStorage.getItem("global_merchant_mode") as "demo" | "custom" | null;
+      const storedCustomId = localStorage.getItem("global_custom_merchant_id");
+      if (storedMode) setMerchantModeState(storedMode);
+      if (storedCustomId) setCustomMerchantIdState(storedCustomId);
+    } catch {
+      // client-side fallback
+    }
+  }, []);
+
+  const setMerchantMode = useCallback((mode: "demo" | "custom") => {
+    setMerchantModeState(mode);
+    try {
+      localStorage.setItem("global_merchant_mode", mode);
+    } catch {}
+  }, []);
+
+  const setCustomMerchantId = useCallback((id: string) => {
+    setCustomMerchantIdState(id);
+    try {
+      localStorage.setItem("global_custom_merchant_id", id);
+    } catch {}
+  }, []);
+
+  const effectiveMerchantId = merchantMode === "demo" ? DEFAULT_DEMO_MERCHANT_ID : (customMerchantId || DEFAULT_DEMO_MERCHANT_ID);
 
   const triggerSpikeEnergy = useCallback((amount: number = 1.4) => {
     setSpikeEnergy(amount);
@@ -145,6 +184,11 @@ export const DemoProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         runAction,
         runAutoplayPitch,
         stopAutoplay,
+        merchantMode,
+        setMerchantMode,
+        customMerchantId,
+        setCustomMerchantId,
+        effectiveMerchantId,
       }}
     >
       {children}

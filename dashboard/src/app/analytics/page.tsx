@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { Navbar } from "@/components/Navbar";
-import { UserCheck, ShieldCheck, RefreshCw, KeyRound, Building2 } from "lucide-react";
+import { useDemo } from "@/context/DemoContext";
 
 interface CarrierRate {
   id: string;
@@ -40,23 +40,20 @@ interface AnalyticsSummary {
   last_synced_at?: string;
 }
 
-const DEFAULT_DEMO_MERCHANT = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 
 export default function AnalyticsPage() {
-  const [selectedMerchantId, setSelectedMerchantId] = useState<string>(DEFAULT_DEMO_MERCHANT);
-  const [customMerchantInput, setCustomMerchantInput] = useState<string>("");
-  const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
+  const { effectiveMerchantId, merchantMode } = useDemo();
 
   const [data, setData] = useState<AnalyticsSummary>({
-    capital_recovered_inr: 249950,
-    arbitration_penalties_avoided_inr: 25000,
-    penalties_avoided_count: 10,
+    capital_recovered_inr: 36100,
+    arbitration_penalties_avoided_inr: 2500,
+    penalties_avoided_count: 1,
     dispute_ratio_percentage: 0.25,
     dispute_ratio_status: "safe",
     total_disputes_30d: 7,
     total_orders_30d: 140,
-    velocity_blocks_count: 1247,
+    velocity_blocks_count: 52,
     trajectory: { safe_pct: 46, watch_pct: 24, danger_pct: 12 },
     carrier_win_rates: [
       { id: "bluedart", carrier_name: "BlueDart Express", win_rate_pct: 92.8, total_disputes: 3, notes: "High-resolution digital signature pads give strong POD verification." },
@@ -73,27 +70,13 @@ export default function AnalyticsPage() {
 
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Check if there's a logged-in merchant ID in localStorage on client mount
-  useEffect(() => {
-    try {
-      const storedMerchant = localStorage.getItem("active_merchant_id") || localStorage.getItem("merchant_id");
-      if (storedMerchant) {
-        setSelectedMerchantId(storedMerchant);
-        setCustomMerchantInput(storedMerchant);
-        setIsCustomMode(true);
-      }
-    } catch {
-      // client storage fallback
-    }
-  }, []);
-
   const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
-      const merchantQuery = selectedMerchantId ? `?merchant_id=${encodeURIComponent(selectedMerchantId)}` : "";
+      const merchantQuery = effectiveMerchantId ? `?merchant_id=${encodeURIComponent(effectiveMerchantId)}` : "";
       const res = await fetch(`${API_BASE_URL}/analytics/summary${merchantQuery}`, {
         headers: {
-          "X-Merchant-Id": selectedMerchantId,
+          "X-Merchant-Id": effectiveMerchantId,
         },
       });
       if (res.ok) {
@@ -105,31 +88,11 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedMerchantId]);
+  }, [effectiveMerchantId]);
 
   useEffect(() => {
     fetchAnalytics();
   }, [fetchAnalytics]);
-
-  const handleApplyCustomMerchant = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (customMerchantInput.trim()) {
-      const id = customMerchantInput.trim();
-      setSelectedMerchantId(id);
-      setIsCustomMode(true);
-      try {
-        localStorage.setItem("active_merchant_id", id);
-      } catch {}
-    }
-  };
-
-  const handleSwitchToDemo = () => {
-    setSelectedMerchantId(DEFAULT_DEMO_MERCHANT);
-    setIsCustomMode(false);
-    try {
-      localStorage.removeItem("active_merchant_id");
-    } catch {}
-  };
 
   const formatINR = (val: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -144,70 +107,21 @@ export default function AnalyticsPage() {
       <Navbar onRefresh={fetchAnalytics} isRefreshing={loading} />
 
       <main className="flex-1">
-        {/* Page Head with Dynamic Merchant Scope Selector */}
-        <div className="pagehead flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="eyebrow">30-Day Trajectory · Carrier Reliability</div>
-            <h1>Risk Analytics</h1>
-            <p>Statutory net financial impact and loss-prevention scorecard computed from database ledgers.</p>
-          </div>
-
-          {/* Logged-In User / Merchant Identity Scoping Panel */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 bg-white border border-[var(--border)] p-2 rounded-xl text-xs shadow-sm">
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-[var(--surface-warm)] rounded-lg text-[var(--text-secondary)] font-mono text-[11px]">
-              <Building2 className="w-3.5 h-3.5 text-[var(--gold)]" />
-              <span>Merchant Account:</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSwitchToDemo}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition ${
-                  !isCustomMode
-                    ? "bg-[var(--gold-soft)] text-[var(--gold)] font-semibold border border-[var(--gold)]/20"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text)]"
-                }`}
-              >
-                Demo Baseline
-              </button>
-
-              <button
-                onClick={() => setIsCustomMode(true)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition ${
-                  isCustomMode
-                    ? "bg-[var(--sage-soft)] text-[var(--sage)] font-semibold border border-[var(--sage)]/20"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text)]"
-                }`}
-              >
-                Custom Merchant ID
-              </button>
-            </div>
-
-            {isCustomMode && (
-              <form onSubmit={handleApplyCustomMerchant} className="flex items-center gap-1.5 mt-1 sm:mt-0">
-                <input
-                  type="text"
-                  placeholder="Paste Merchant UUID / Auth ID…"
-                  value={customMerchantInput}
-                  onChange={(e) => setCustomMerchantInput(e.target.value)}
-                  className="bg-[var(--surface-warm)] border border-[var(--border-strong)] rounded px-2 py-1 text-[11px] font-mono w-48 focus:outline-none focus:border-[var(--sage)] text-[var(--text)]"
-                />
-                <button type="submit" className="btn btn-primary !py-1 !px-2 text-[10px] font-mono">
-                  Apply
-                </button>
-              </form>
-            )}
-          </div>
+        {/* Page Head */}
+        <div className="pagehead">
+          <div className="eyebrow">30-Day Trajectory · Carrier Reliability</div>
+          <h1>Risk Analytics</h1>
+          <p>Statutory net financial impact and loss-prevention scorecard computed from database ledgers.</p>
         </div>
 
-        {/* Active Account Identity Pill */}
+        {/* Global Active Account Scoping Ribbon */}
         <div className="mb-4 flex items-center justify-between px-3 py-1.5 rounded-lg bg-[var(--surface-warm)] border border-[var(--border)] text-[11px] font-mono text-[var(--text-secondary)]">
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${isCustomMode ? "bg-[var(--sage)]" : "bg-[var(--gold)]"}`} />
+            <span className={`w-2 h-2 rounded-full ${merchantMode === "custom" ? "bg-[var(--sage)]" : "bg-[var(--gold)]"}`} />
             <span>
-              Active Ledger Filter: <strong>{isCustomMode ? "Authenticated Merchant Session" : "Deterministic Demo Sandbox"}</strong>
+              Active Ledger Scope: <strong>{merchantMode === "custom" ? "Live Custom Merchant Account" : "Deterministic Demo Sandbox"}</strong>
             </span>
-            <span className="opacity-60">({selectedMerchantId})</span>
+            <span className="opacity-60">({effectiveMerchantId})</span>
           </div>
 
           {data.last_synced_at && (
@@ -240,9 +154,9 @@ export default function AnalyticsPage() {
               className="stat-num font-mono"
               style={{
                 color:
-                  data.dispute_ratio_status === "safe"
+                  data.dispute_ratio_percentage < 0.30
                     ? "var(--sage)"
-                    : data.dispute_ratio_status === "watch"
+                    : data.dispute_ratio_percentage < 0.45
                     ? "var(--amber)"
                     : "var(--rose)",
               }}
