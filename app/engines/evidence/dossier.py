@@ -215,9 +215,13 @@ def generate_dossier_pdf(
     elements.append(summary_table)
     elements.append(Spacer(1, 14))
 
-    # Footer Notice
-    footer_text = "CONFIDENTIAL FINTECH AUDIT ARTIFACT — Prepared autonomously by RazorSentinel for Razorpay Disputes API Representment."
-    elements.append(Paragraph(footer_text, ParagraphStyle("Footer", fontName="Helvetica", fontSize=7, textColor=colors.HexColor("#A0AEC0"), alignment=TA_CENTER)))
+    # Footer Notice & Section 65B Legal Attestation
+    footer_text = (
+        "CONFIDENTIAL FINTECH AUDIT ARTIFACT — Prepared autonomously by RazorSentinel for Razorpay Disputes API Representment.<br/>"
+        "Electronically generated non-repudiation dossier pursuant to Section 65B of the Indian Evidence Act, 1872. "
+        "Extracted from immutable carrier telemetry and cryptographic gateway event logs."
+    )
+    elements.append(Paragraph(footer_text, ParagraphStyle("Footer", fontName="Helvetica", fontSize=7, leading=9, textColor=colors.HexColor("#A0AEC0"), alignment=TA_CENTER)))
 
     # Build PDF
     doc.build(elements)

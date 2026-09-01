@@ -30,17 +30,20 @@ class GeminiAPIError(ExtractionError):
     pass
 
 
-def _mask_pii_text(text: str) -> str:
-    """Masks Indian phone numbers and credit card numbers according to DPDP Act 2023 / GDPR."""
+def sanitize_pii(text: str) -> str:
+    """Masks 16-digit card numbers and Indian mobile numbers for DPDP Act compliance."""
     if not text:
         return ""
-    # Mask 10-digit Indian phone numbers
-    phone_pattern = r"(\+?91[-.\s]?)?([6-9]\d{1})\d{6}(\d{2})"
-    masked = re.sub(phone_pattern, r"+91-\2XXXXXX\3", text)
-    # Mask 16-digit card PANs
-    card_pattern = r"\b(\d{4})[-.\s]?\d{4}[-.\s]?\d{4}[-.\s]?(\d{4})\b"
-    masked = re.sub(card_pattern, r"\1-XXXX-XXXX-\2", masked)
-    return masked
+    # Mask 16-digit Card Numbers
+    text = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CARD_REDACTED]', text)
+    # Mask Indian Mobile Numbers
+    text = re.sub(r'(?:\+91|0)?[6-9]\d{9}', '[PHONE_REDACTED]', text)
+    return text
+
+
+def _mask_pii_text(text: str) -> str:
+    """Masks Indian phone numbers and credit card numbers according to DPDP Act 2023 / GDPR."""
+    return sanitize_pii(text)
 
 
 def audit_whatsapp_chat(
@@ -210,6 +213,7 @@ def analyze_dispute_evidence(
             },
         )
 
+        sanitized_chat = sanitize_pii(chat_log_text or "")
         prompt = (
             "Analyze the provided courier waybill, proof-of-delivery signature image, and merchant-customer "
             "support chat history. Extract structured evidence for a chargeback representment in JSON matching this schema:\n"
@@ -225,7 +229,7 @@ def analyze_dispute_evidence(
             '  "legal_summary": string\n'
             "}\n\n"
             "Reflect missing, blurred, or degraded evidence honestly in completeness_score rather than hallucinating details.\n\n"
-            f"Support chat transcript:\n{chat_log_text or 'No chat transcript provided.'}"
+            f"Support chat transcript:\n{sanitized_chat or 'No chat transcript provided.'}"
         )
 
         contents = [prompt]
